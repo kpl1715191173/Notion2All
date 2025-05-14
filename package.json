@@ -1,0 +1,34 @@
+{
+  "name": "notion2all",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A tool to export Notion pages to various formats",
+  "main": "index.js",
+  "scripts": {
+    "preinstall": "npx only-allow pnpm",
+    "postinstall": "pnpm link --global",
+    "dev": "pnpm --filter @notion2all/web dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.2",
+    "eslint": "^8.54.0",
+    "prettier": "^3.1.0",
+    "tsup": "^8.0.1"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "dependencies": {
+    "@notionhq/client": "^2.2.14",
+    "dotenv": "^16.3.1",
+    "commander": "^11.1.0"
+  },
+  "bin": {
+    "notion2all": "./cli.js"
+  }
+} 
