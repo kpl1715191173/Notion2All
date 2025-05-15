@@ -15,7 +15,8 @@
     "paths": {
       "@notion2all/core": ["packages/core/src"],
       "@notion2all/web": ["packages/web/src"],
-      "@notion2all/cli": ["packages/cli/src"]
+      "@notion2all/cli": ["packages/cli/src"],
+      "@notion2all/config": ["packages/config/src"]
     }
   },
   "exclude": ["node_modules", "dist"]

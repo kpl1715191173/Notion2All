@@ -1,12 +1,16 @@
 #!/usr/bin/env node
 
-const { program } = require('commander');
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
+import { Command } from 'commander';
+import fs from 'fs';
+import path from 'path';
+import { execSync } from 'child_process';
+
+interface Config {
+  apiKey?: string;
+}
 
 // 检查并安装依赖
-function checkAndInstallDependencies() {
+function checkAndInstallDependencies(): void {
   try {
     if (!fs.existsSync('./node_modules')) {
       console.log('正在安装依赖...');
@@ -19,7 +23,7 @@ function checkAndInstallDependencies() {
 }
 
 // 检查并创建全局链接
-function checkAndCreateGlobalLink() {
+function checkAndCreateGlobalLink(): void {
   try {
     console.log('正在创建全局链接...');
     execSync('pnpm link --global', { stdio: 'inherit' });
@@ -30,7 +34,7 @@ function checkAndCreateGlobalLink() {
 }
 
 // 设置API密钥的公共函数
-function setApiKey(apiKey) {
+function setApiKey(apiKey: string): boolean {
   if (!apiKey) {
     console.log('请提供API密钥');
     return false;
@@ -38,7 +42,7 @@ function setApiKey(apiKey) {
 
   try {
     const configPath = path.join(process.cwd(), '.notion2allrc');
-    let config = {};
+    let config: Config = {};
     
     // 如果文件已存在，尝试读取现有配置
     if (fs.existsSync(configPath)) {
@@ -48,7 +52,7 @@ function setApiKey(apiKey) {
           config = JSON.parse(fileContent);
         }
       } catch (error) {
-        console.warn(`警告: 读取现有配置文件时出错: ${error.message}`);
+        console.warn(`警告: 读取现有配置文件时出错: ${error instanceof Error ? error.message : String(error)}`);
         // 出错时使用空对象继续
       }
     }
@@ -59,16 +63,18 @@ function setApiKey(apiKey) {
     console.log('✅ API_KEY已成功设置');
     return true;
   } catch (error) {
-    console.error(`设置API_KEY时出错: ${error.message}`);
+    console.error(`设置API_KEY时出错: ${error instanceof Error ? error.message : String(error)}`);
     return false;
   }
 }
+
+const program = new Command();
 
 program
   .command('config')
   .description('配置API_KEY')
   .option('--api-key <key>', '设置Notion API密钥')
-  .action((options) => {
+  .action((options: { apiKey?: string }) => {
     if (options.apiKey) {
       if (!setApiKey(options.apiKey)) {
         process.exit(1);
@@ -78,4 +84,4 @@ program
     }
   });
 
-program.parse(process.argv);
+program.parse(process.argv); 
