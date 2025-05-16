@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander'
-import { backupCommand } from './commands/backup'
+import { registerCommands } from './commands'
 
 const program = new Command()
 
@@ -10,7 +10,7 @@ program
   .description('A tool to export Notion pages to various formats')
   .version('1.0.0')
 
-// 备份命令
-backupCommand(program)
+// 注册所有命令
+registerCommands(program)
 
 program.parse()
