@@ -5,7 +5,8 @@
  */
 
 import { Client } from '@notionhq/client'
-import type { LogLevel, ClientOptions } from '@notionhq/client'
+import type { LogLevel } from '@notionhq/client'
+import type { ClientOptions } from '@notionhq/client/build/src/client'
 import type {
   PageObjectResponse,
   DatabaseObjectResponse,

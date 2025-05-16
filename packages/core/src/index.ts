@@ -5,14 +5,14 @@
  */
 
 // 导出Notion API客户端
-export * from './notion/client.js'
+export * from './notion/client'
 
 // 导出类型定义
-export * from './types/index.js'
+export * from './types/index'
 
 // 导出数据转换器
-export * from './transformers/json-to-md.js'
-export * from './transformers/json-to-obsidian.js'
+export * from './transformers/json-to-md'
+export * from './transformers/json-to-obsidian'
 
 // 导出工具函数
-export * from './utils/index.js'
+export * from './utils/index'

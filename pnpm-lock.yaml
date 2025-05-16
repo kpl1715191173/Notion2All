@@ -48,6 +48,9 @@ importers:
       '@notion2all/config':
         specifier: workspace:^1.0.0
         version: link:../config
+      '@notion2all/core':
+        specifier: workspace:*
+        version: link:../core
       commander:
         specifier: ^11.1.0
         version: 11.1.0

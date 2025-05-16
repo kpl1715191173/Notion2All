@@ -1,7 +1,7 @@
 import { Command } from 'commander'
-import { ConfigLoader } from '@notion2all/config'
-import { log, errorLog, successLog, warningLog, LogLevel } from '../utils'
-import { Config } from '@notion2all/config'
+import { Config, ConfigLoader } from '@notion2all/config'
+import { createNotionClient } from '@notion2all/core'
+import { log, errorLog, LogLevel, successLog, warningLog } from '../utils'
 
 export const backupCommand = (program: Command) => {
   program
@@ -17,7 +17,9 @@ export const backupCommand = (program: Command) => {
       try {
         log('👾 开始备份...')
 
-        // 加载配置
+        /**
+         * ====== 加载配置 ======
+         */
         log('1️⃣正在加载配置...', LogLevel.level0)
         const configLoader = ConfigLoader.getInstance()
         const config = await configLoader.load()
@@ -26,13 +28,8 @@ export const backupCommand = (program: Command) => {
         if (!apiKeyInfo?.key) {
           errorLog('无法获取API_KEY，请检查后重试', LogLevel.level1)
         } else {
-          successLog('API_KEY检查通过', LogLevel.level1)
+          successLog('API_KEY 检查通过', LogLevel.level1)
         }
-
-        // 创建 Notion 客户端
-        // const notionClient = createNotionClient({
-        //   auth: apiKeyInfo?.key || '',
-        // })
 
         // 命令行参数覆盖配置
         if (options.format) config.format = options.format as Config['format']
@@ -55,52 +52,33 @@ export const backupCommand = (program: Command) => {
 
         log(formattedConfig, LogLevel.level2)
 
-        if (config.pages.length > 0) {
-          log('📄 备份页面:', LogLevel.level1)
-          config.pages.forEach((page, index) => {
-            const pageInfo = typeof page === 'string' ? page : `${page.name} (${page.id})`
-            log(`${index + 1}. ${pageInfo}`, LogLevel.level2)
-          })
-        } else {
-          warningLog('⚠️ 没有配置需要备份的页面', LogLevel.level1)
-        }
-
         log(`📂 输出目录: ${config.outputDir}`, LogLevel.level1)
         log(`📎 附件处理: ${config.includeAttachments}`, LogLevel.level1)
         log(`🔄 递归备份: ${config.recursive ? '是' : '否'}`, LogLevel.level1)
 
         successLog('配置加载完成\n', LogLevel.level1)
 
+        /**
+         * ====== 备份逻辑 ======
+         */
         log('2️⃣正在开始备份...', LogLevel.level0)
 
-        // 遍历配置的页面进行备份
-        // for (const pageConfig of config.pages) {
-        //   const pageId = typeof pageConfig === 'string' ? pageConfig : pageConfig.id
-        //   try {
-        //     log(`\n📑 正在获取页面 ${pageId} 的内容...`, LogLevel.level1)
-        //
-        //     // 获取页面基本信息
-        //     const page = await notionClient.getPage(pageId)
-        //     log('✅ 页面基本信息获取成功', LogLevel.level2)
-        //     log('页面信息:', LogLevel.level2)
-        //     log(JSON.stringify(page, null, 2), LogLevel.level3)
-        //
-        //     // 获取页面内容块
-        //     const blocks = await notionClient.getBlockChildren(pageId)
-        //     log('✅ 页面内容块获取成功', LogLevel.level2)
-        //     log('内容块信息:', LogLevel.level2)
-        //     log(JSON.stringify(blocks, null, 2), LogLevel.level3)
-        //
-        //     // 如果需要递归获取子页面
-        //     if (config.recursive) {
-        //       log('🔄 正在递归获取子页面...', LogLevel.level2)
-        //       // TODO: 实现递归获取子页面的逻辑
-        //     }
-        //   } catch (error: unknown) {
-        //     const errorMessage = error instanceof Error ? error.message : String(error)
-        //     errorLog(`备份页面 ${pageId} 失败: ${errorMessage}`)
-        //   }
-        // }
+        const notionClient = createNotionClient({
+          auth: apiKeyInfo?.key!,
+        })
+        if (notionClient) {
+          successLog('Notion SDK初始化成功', LogLevel.level1)
+        }
+
+        if (config.pages.length > 0) {
+          log('📄 备份页面:', LogLevel.level1)
+          for (const page of config.pages) {
+            const pageData = await notionClient.getPage(typeof page === 'string' ? page : page.id)
+            console.log(pageData)
+          }
+        } else {
+          warningLog('⚠️ 没有配置需要备份的页面', LogLevel.level1)
+        }
 
         successLog('备份完成！', LogLevel.level0)
       } catch (err: unknown) {

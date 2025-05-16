@@ -2,12 +2,11 @@
   "name": "@notion2all/core",
   "version": "0.1.0",
   "description": "Notion2All的核心功能包，包含Notion API交互和数据转换",
-  "type": "module",
   "main": "dist/index.js",
-  "module": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
+      "require": "./dist/index.js",
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
     }
