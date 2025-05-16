@@ -21,24 +21,22 @@
 
 ## 快速开始
 
-1. 初始化项目并设置 API_KEY：
+1. 初始化项目：
+
 ```bash
-pnpm notion2all init --api-key YOUR_API_KEY
+pnpm install
 ```
 
 这个命令会自动：
+
 - 安装所需依赖
-- 创建全局链接
+- 创建全局链接（后续全局命令待实现）
 - 设置 API_KEY
 
-2. 如果你只想更新 API_KEY，可以使用：
+2. 设置API_KEY：
+
 ```bash
 pnpm notion2all config --api-key YOUR_API_KEY
-```
-
-3. 运行程序：
-```bash
-pnpm start
 ```
 
 ## API_KEY 设置方式
@@ -46,16 +44,19 @@ pnpm start
 你可以通过以下三种方式设置 API_KEY：
 
 1. 使用 CLI 命令（推荐）：
+
 ```bash
 pnpm notion2all init --api-key YOUR_API_KEY
 ```
 
 2. 在项目根目录创建 .env 文件：
+
 ```
 NOTION_API_KEY=YOUR_API_KEY
 ```
 
 3. 设置环境变量：
+
 ```bash
 # Linux/Mac
 export API_KEY=YOUR_API_KEY
@@ -82,4 +83,4 @@ pnpm lint
 
 ## 许可证
 
-MIT 
+MIT

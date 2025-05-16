@@ -1,7 +1,7 @@
 import { config } from 'dotenv'
-import { readFileSync, existsSync } from 'fs'
+import { readFileSync, existsSync, writeFileSync } from 'fs'
 import { join, dirname } from 'path'
-import { Config, ConfigSchema } from '../types'
+import { Config, ConfigSchema, ApiKeyInfo, ApiKeySource } from '../types'
 import { DEFAULT_CONFIG } from '../defaults'
 import { register } from 'ts-node'
 
@@ -9,12 +9,15 @@ export class ConfigLoader {
   private static instance: ConfigLoader
   private config: Config | null = null
   private configPath: string | null = null
+  private rcFilePath: string | null = null
 
   private constructor() {
     // 加载环境变量
     config()
     // 注册 ts-node
     register()
+    // 初始化 rc 文件路径
+    this.rcFilePath = join(process.cwd(), '.notion2allrc')
   }
 
   static getInstance(): ConfigLoader {
@@ -44,6 +47,27 @@ export class ConfigLoader {
     }
 
     return null
+  }
+
+  private loadRcFile(): Partial<Config> {
+    try {
+      if (existsSync(this.rcFilePath!)) {
+        const content = readFileSync(this.rcFilePath!, 'utf-8').trim()
+        // 如果文件为空，返回空对象
+        if (!content) {
+          return {}
+        }
+        return JSON.parse(content)
+      }
+    } catch (error) {
+      // 如果是 JSON 解析错误，返回空对象
+      if (error instanceof SyntaxError) {
+        console.warn('警告: .notion2allrc 文件格式不正确，将使用空配置')
+        return {}
+      }
+      console.warn('读取 .notion2allrc 文件失败:', error)
+    }
+    return {}
   }
 
   private loadTypeScriptConfig(configPath: string): Partial<Config> {
@@ -90,13 +114,17 @@ export class ConfigLoader {
     // 2. 加载配置文件
     const fileConfig = this.loadConfigFile()
 
-    // 3. 合并配置（优先级：配置文件 > 默认配置）
+    // 3. 加载 rc 文件
+    const rcConfig = this.loadRcFile()
+
+    // 4. 合并配置（优先级：rc文件 > 配置文件 > 默认配置）
     const mergedConfig = {
       ...defaultConfig,
       ...fileConfig,
+      ...rcConfig,
     }
 
-    // 4. 验证配置
+    // 5. 验证配置
     const result = ConfigSchema.safeParse(mergedConfig)
 
     if (!result.success) {
@@ -105,6 +133,63 @@ export class ConfigLoader {
 
     this.config = result.data
     return this.config
+  }
+
+  async setApiKey(apiKey: string): Promise<void> {
+    // 优先写入 rc 文件
+    try {
+      const rcConfig = this.loadRcFile()
+      const updatedConfig = {
+        ...rcConfig,
+        apiKey,
+      }
+      // 确保目录存在
+      const rcDir = dirname(this.rcFilePath!)
+      if (!existsSync(rcDir)) {
+        // 如果目录不存在，创建它
+        require('fs').mkdirSync(rcDir, { recursive: true })
+      }
+      writeFileSync(this.rcFilePath!, JSON.stringify(updatedConfig, null, 2))
+    } catch (error) {
+      console.error('写入 .notion2allrc 文件失败:', error)
+      throw error
+    }
+
+    // 更新内存中的配置
+    if (this.config) {
+      this.config.apiKey = apiKey
+    }
+  }
+
+  async getApiKey(): Promise<ApiKeyInfo | undefined> {
+    // 1. 首先检查环境变量
+    const envApiKey = process.env.NOTION_API_KEY
+    if (envApiKey) {
+      return {
+        key: envApiKey,
+        source: ApiKeySource.ENV,
+      }
+    }
+
+    // 2. 检查 rc 文件
+    const rcConfig = this.loadRcFile()
+    if (rcConfig.apiKey) {
+      return {
+        key: rcConfig.apiKey,
+        source: ApiKeySource.RC_FILE,
+      }
+    }
+
+    // 3. 检查配置文件
+    const config = await this.load()
+    if (config.apiKey) {
+      return {
+        key: config.apiKey,
+        source: ApiKeySource.CONFIG_FILE,
+      }
+    }
+
+    return undefined
   }
 
   // 获取配置文件路径

@@ -6,4 +6,5 @@ export const DEFAULT_CONFIG: Config = {
   outputDir: './build/meta',
   includeAttachments: 'onlyPic',
   recursive: true,
+  apiKey: undefined,
 }

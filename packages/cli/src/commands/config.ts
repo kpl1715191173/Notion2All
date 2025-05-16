@@ -1,60 +1,43 @@
 import { Command } from 'commander'
-import fs from 'fs'
-import path from 'path'
-
-interface Config {
-  apiKey?: string
-}
-
-// 设置API密钥的公共函数
-export function setApiKey(apiKey: string): boolean {
-  if (!apiKey) {
-    console.log('请提供API密钥')
-    return false
-  }
-
-  try {
-    const configPath = path.join(process.cwd(), '.notion2allrc')
-    let config: Config = {}
-
-    // 如果文件已存在，尝试读取现有配置
-    if (fs.existsSync(configPath)) {
-      try {
-        const fileContent = fs.readFileSync(configPath, 'utf8')
-        if (fileContent && fileContent.trim() !== '') {
-          config = JSON.parse(fileContent)
-        }
-      } catch (error) {
-        console.warn(
-          `警告: 读取现有配置文件时出错: ${error instanceof Error ? error.message : String(error)}`
-        )
-        // 出错时使用空对象继续
-      }
-    }
-
-    // 更新配置
-    config.apiKey = apiKey
-    fs.writeFileSync(configPath, JSON.stringify(config, null, 2))
-    console.log('✅ API_KEY已成功设置')
-    return true
-  } catch (error) {
-    console.error(`设置API_KEY时出错: ${error instanceof Error ? error.message : String(error)}`)
-    return false
-  }
-}
+import { ConfigLoader } from '@notion2all/config'
+import { ApiKeySource } from '@notion2all/config'
 
 export function configCommand(program: Command) {
   program
     .command('config')
     .description('配置API_KEY')
     .option('--api-key <key>', '设置Notion API密钥')
-    .action((options: { apiKey?: string }) => {
+    .option('--show', '显示当前API_KEY的来源')
+    .action(async (options: { apiKey?: string; show?: boolean }) => {
+      const configLoader = ConfigLoader.getInstance()
+
+      if (options.show) {
+        const apiKeyInfo = await configLoader.getApiKey()
+        if (apiKeyInfo) {
+          const sourceMap = {
+            [ApiKeySource.ENV]: '环境变量',
+            [ApiKeySource.RC_FILE]: '.notion2allrc 文件',
+            [ApiKeySource.CONFIG_FILE]: '配置文件',
+          }
+          console.log(`当前API_KEY来源: ${sourceMap[apiKeyInfo.source]}`)
+        } else {
+          console.log('未找到API_KEY')
+        }
+        return
+      }
+
       if (options.apiKey) {
-        if (!setApiKey(options.apiKey)) {
+        try {
+          await configLoader.setApiKey(options.apiKey)
+          console.log('✅ API_KEY已成功设置到 .notion2allrc 文件')
+        } catch (error) {
+          console.error(
+            `设置API_KEY时出错: ${error instanceof Error ? error.message : String(error)}`
+          )
           process.exit(1)
         }
       } else {
-        console.log('请使用 --api-key 选项提供API密钥')
+        console.log('请使用 --api-key 选项提供API密钥，或使用 --show 选项查看当前API_KEY来源')
       }
     })
 }

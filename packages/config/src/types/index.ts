@@ -19,7 +19,25 @@ export const BackupConfigSchema = z.object({
 
 export type BackupConfig = z.infer<typeof BackupConfigSchema>
 
+// 认证配置
+export const AuthConfigSchema = z.object({
+  apiKey: z.string().optional(),
+})
+
 // 主配置
-export const ConfigSchema = BackupConfigSchema
+export const ConfigSchema = BackupConfigSchema.merge(AuthConfigSchema)
 
 export type Config = z.infer<typeof ConfigSchema>
+
+// API KEY 来源
+export enum ApiKeySource {
+  ENV = 'env',
+  CONFIG_FILE = 'config_file',
+  RC_FILE = 'rc_file',
+}
+
+// API KEY 信息
+export interface ApiKeyInfo {
+  key: string
+  source: ApiKeySource
+}
