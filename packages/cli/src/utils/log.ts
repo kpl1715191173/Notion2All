@@ -13,7 +13,7 @@ export const log = (message: string, level: LogLevel = LogLevel.level0): void =>
 
 export const errorLog = (message: string, level: LogLevel = LogLevel.level0): void => {
   const indent = ' '.repeat(level * 2)
-  console.error(`${indent}❌ ${message}`)
+  console.error(`${indent}❌  ${message}`)
 }
 
 export const successLog = (message: string, level: LogLevel = LogLevel.level0): void => {
@@ -30,5 +30,5 @@ export const warningLog = (message: string, level: LogLevel = LogLevel.level0): 
  * 关于 Emoji 的输出说明
  * Window Powershell 中
  * 数字1️⃣2️⃣...自带一个空格
- * ✅ 需要多增加一个空格
+ * ✅❌ 需要多增加一个空格
  */
