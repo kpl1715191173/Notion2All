@@ -5,7 +5,7 @@
  */
 
 // 导出Notion API客户端
-export * from './notion/client'
+export * from './notion/api'
 
 // 导出类型定义
 export * from './types/index'
@@ -16,3 +16,6 @@ export * from './transformers/json-to-obsidian'
 
 // 导出工具函数
 export * from './utils/index'
+
+
+export * from './notion/page'

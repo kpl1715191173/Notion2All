@@ -16,7 +16,8 @@ import type { NotionPage, NoteMetadata, ExportOptions } from '../types'
 export async function convertToMarkdown(
   notionPage: NotionPage,
   options: ExportOptions
-): Promise<string> {
+): Promise<void> {
+// ): Promise<string> {
   // 提取元数据
   // const metadata = extractMetadata(notionPage)
   //

@@ -1,6 +1,6 @@
 import { Command } from 'commander'
 import { Config, ConfigLoader } from '@notion2all/config'
-import { createNotionClient } from '@notion2all/core'
+import { createNotionApi, getFullPageData } from '@notion2all/core'
 import { log, errorLog, LogLevel, successLog, warningLog } from '../utils'
 
 export const backupCommand = (program: Command) => {
@@ -63,18 +63,25 @@ export const backupCommand = (program: Command) => {
          */
         log('2️⃣正在开始备份...', LogLevel.level0)
 
-        const notionClient = createNotionClient({
+        const notionApi = createNotionApi({
           auth: apiKeyInfo?.key!,
         })
-        if (notionClient) {
+        if (notionApi) {
           successLog('Notion SDK初始化成功', LogLevel.level1)
         }
 
         if (config.pages.length > 0) {
           log('📄 备份页面:', LogLevel.level1)
           for (const page of config.pages) {
-            const pageData = await notionClient.getPage(typeof page === 'string' ? page : page.id)
-            console.log(pageData)
+            try {
+              const pageWithBlocks = await getFullPageData(
+                notionApi,
+                typeof page === 'string' ? page : page.id
+              )
+              console.log(pageWithBlocks)
+            } catch (error) {
+              errorLog(`处理页面 ${typeof page === 'string' ? page : page.id} 失败: ${error instanceof Error ? error.message : String(error)}`, LogLevel.level1)
+            }
           }
         } else {
           warningLog('⚠️ 没有配置需要备份的页面', LogLevel.level1)

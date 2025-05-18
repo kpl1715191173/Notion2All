@@ -31,7 +31,8 @@ export interface ObsidianExportOptions extends ExportOptions {
 export async function convertToObsidianMarkdown(
   notionPage: NotionPage,
   options: ObsidianExportOptions
-): Promise<string> {
+): Promise<void> {
+// ): Promise<string> {
   // // 首先转换为普通Markdown
   // let markdown = await convertToMarkdown(notionPage, options)
   //
