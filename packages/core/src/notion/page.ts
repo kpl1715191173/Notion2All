@@ -24,7 +24,14 @@ export async function getAllBlocks(api: NotionApi, blockId: string): Promise<Not
           children: []
         }
         
-        if ('has_children' in block && block.has_children) {
+        // 处理子页面
+        if (block.type === 'child_page') {
+          // 获取子页面的完整数据
+          const childPageData = await getFullPageData(api, block.id)
+          blockWithChildren.children = childPageData.children
+        }
+        // 处理其他有子块的类型
+        else if ('has_children' in block && block.has_children) {
           blockWithChildren.children = await getAllBlocks(api, block.id)
         }
         
