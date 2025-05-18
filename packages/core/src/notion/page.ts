@@ -1,8 +1,14 @@
 import { NotionApi } from './api'
 import { BlockObjectResponse } from '@notionhq/client/build/src/api-endpoints'
+import { NotionPageSaver } from './saver'
 
 export type NotionBlock = BlockObjectResponse & {
   children?: NotionBlock[]
+}
+
+export interface GetFullPageDataOptions {
+  saveToFile?: boolean
+  outputDir?: string
 }
 
 export async function getAllBlocks(api: NotionApi, blockId: string): Promise<NotionBlock[]> {
@@ -32,12 +38,28 @@ export async function getAllBlocks(api: NotionApi, blockId: string): Promise<Not
   return blocks
 }
 
-export async function getFullPageData(api: NotionApi, pageId: string) {
+export async function getFullPageData(
+  api: NotionApi,
+  pageId: string,
+  options?: GetFullPageDataOptions
+) {
   const pageData = await api.getPage(pageId)
   const blocks = await getAllBlocks(api, pageData.id)
   
-  return {
+  const fullData = {
     ...pageData,
     children: blocks
   }
+
+  // 如果需要保存到文件
+  if (options?.saveToFile && options?.outputDir) {
+    const saver = new NotionPageSaver(options.outputDir)
+    const saveResult = await saver.savePageData(pageId, fullData)
+    
+    if (!saveResult.success) {
+      throw new Error(`保存页面数据失败: ${saveResult.error}`)
+    }
+  }
+
+  return fullData
 } 

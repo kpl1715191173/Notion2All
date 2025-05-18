@@ -1,4 +1,5 @@
 import { Command } from 'commander'
+import path from 'path'
 import { Config, ConfigLoader } from '@notion2all/config'
 import { createNotionApi, getFullPageData } from '@notion2all/core'
 import { log, errorLog, LogLevel, successLog, warningLog } from '../utils'
@@ -74,11 +75,19 @@ export const backupCommand = (program: Command) => {
           log('📄 备份页面:', LogLevel.level1)
           for (const page of config.pages) {
             try {
+              const pageId = typeof page === 'string' ? page : page.id
+              log(`处理页面 ${pageId}...`, LogLevel.level2)
+              
               const pageWithBlocks = await getFullPageData(
                 notionApi,
-                typeof page === 'string' ? page : page.id
+                pageId,
+                {
+                  saveToFile: true,
+                  outputDir: config.outputDir
+                }
               )
-              console.log(pageWithBlocks)
+              
+              successLog(`页面 ${pageId} 备份成功`, LogLevel.level2)
             } catch (error) {
               errorLog(`处理页面 ${typeof page === 'string' ? page : page.id} 失败: ${error instanceof Error ? error.message : String(error)}`, LogLevel.level1)
             }
