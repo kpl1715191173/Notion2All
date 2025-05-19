@@ -37,6 +37,22 @@ export class NotionPageSaver {
   }
 
   /**
+   * 格式化页面 ID，确保使用带连字符的格式
+   * @param pageId 页面ID
+   * @returns 格式化后的页面ID
+   */
+  private formatPageId(pageId: string): string {
+    // 如果已经是带连字符的格式，直接返回
+    if (pageId.includes('-')) {
+      return pageId
+    }
+    
+    // 将不带连字符的 ID 转换为带连字符的格式
+    // 例如：1664f1d48d2b80f9929ad415aa88b822 -> 1664f1d4-8d2b-80f9-929a-d415aa88b822
+    return pageId.replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, '$1-$2-$3-$4-$5')
+  }
+
+  /**
    * 确保输出目录存在
    * @throws 如果创建目录失败且错误不是目录已存在
    */
@@ -62,8 +78,12 @@ export class NotionPageSaver {
     try {
       await this.ensureOutputDir()
 
-      const fileName = `${pageId}.json`
-      const filePath = path.join(this.outputDir, fileName)
+      const formattedPageId = this.formatPageId(pageId)
+      const pageDir = path.join(this.outputDir, formattedPageId)
+      await mkdir(pageDir, { recursive: true })
+
+      const fileName = `${formattedPageId}.json`
+      const filePath = path.join(pageDir, fileName)
 
       await writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8')
 
@@ -94,11 +114,13 @@ export class NotionPageSaver {
     try {
       await this.ensureOutputDir()
 
-      // 创建父页面目录下的 sub_pages 目录
-      const subPagesDir = path.join(this.outputDir, parentPageId, 'sub_pages')
+      const formattedParentPageId = this.formatPageId(parentPageId)
+      const formattedSubPageId = this.formatPageId(subPageId)
+      
+      const subPagesDir = path.join(this.outputDir, formattedParentPageId, 'sub_pages')
       await mkdir(subPagesDir, { recursive: true })
 
-      const fileName = `${subPageId}.json`
+      const fileName = `${formattedSubPageId}.json`
       const filePath = path.join(subPagesDir, fileName)
 
       await writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8')
