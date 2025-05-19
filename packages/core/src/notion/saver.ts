@@ -45,7 +45,9 @@ export class NotionPageSaver {
       await mkdir(this.outputDir, { recursive: true })
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
-        throw new Error(`创建输出目录失败: ${error instanceof Error ? error.message : String(error)}`)
+        throw new Error(
+          `创建输出目录失败: ${error instanceof Error ? error.message : String(error)}`
+        )
       }
     }
   }
@@ -59,21 +61,57 @@ export class NotionPageSaver {
   async savePageData(pageId: string, data: PageObject): Promise<SaveResult> {
     try {
       await this.ensureOutputDir()
-      
+
       const fileName = `${pageId}.json`
       const filePath = path.join(this.outputDir, fileName)
-      
+
       await writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8')
-      
+
       return {
         success: true,
-        filePath
+        filePath,
       }
     } catch (error) {
       return {
         success: false,
-        error: error instanceof Error ? error.message : String(error)
+        error: error instanceof Error ? error.message : String(error),
       }
     }
   }
-} 
+
+  /**
+   * 保存子页面数据到文件
+   * @param parentPageId 父页面ID
+   * @param subPageId 子页面ID
+   * @param data 子页面数据
+   * @returns 保存结果
+   */
+  async saveSubPage(
+    parentPageId: string,
+    subPageId: string,
+    data: PageObject
+  ): Promise<SaveResult> {
+    try {
+      await this.ensureOutputDir()
+
+      // 创建父页面目录下的 sub_pages 目录
+      const subPagesDir = path.join(this.outputDir, parentPageId, 'sub_pages')
+      await mkdir(subPagesDir, { recursive: true })
+
+      const fileName = `${subPageId}.json`
+      const filePath = path.join(subPagesDir, fileName)
+
+      await writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8')
+
+      return {
+        success: true,
+        filePath,
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      }
+    }
+  }
+}
