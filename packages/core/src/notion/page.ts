@@ -36,7 +36,7 @@ export async function getAllBlocks(
 
           // 如果需要保存到文件
           if (options?.saveToFile && options?.outputDir) {
-            const saver = new NotionPageSaver(options.outputDir)
+            const saver = new NotionPageSaver({ outputDir: options.outputDir })
             // 保存子页面到父页面目录下
             await saver.savePageData(block.id, childPageData, blockId)
           }
@@ -95,7 +95,7 @@ export async function getFullPageData(
 
   // 保存页面数据
   if (options?.saveToFile && options?.outputDir) {
-    const saver = new NotionPageSaver(options.outputDir)
+    const saver = new NotionPageSaver({ outputDir: options.outputDir })
     const saveResult = await saver.savePageData(pageId, fullData, parentPageId)
 
     if (!saveResult.success) {

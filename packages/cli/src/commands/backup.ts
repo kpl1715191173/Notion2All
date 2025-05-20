@@ -1,5 +1,4 @@
 import { Command } from 'commander'
-import path from 'path'
 import { Config, ConfigLoader } from '@notion2all/config'
 import { createNotionApi, NotionPageSaver, SaveResult } from '@notion2all/core'
 import { log, errorLog, LogLevel, successLog, warningLog } from '../utils'
@@ -78,7 +77,10 @@ export const backupCommand = (program: Command) => {
               const pageId = typeof page === 'string' ? page : page.id
               log(`处理页面 ${pageId}...`, LogLevel.level2)
 
-              const saver = new NotionPageSaver(config.outputDir)
+              const saver = new NotionPageSaver({
+                outputDir: config.outputDir,
+                logRecursive: config.logRecursive,
+              })
               const results: SaveResult[] = await saver.savePageRecursively(pageId, notionApi)
               const failed = results.filter((r: SaveResult) => !r.success)
               if (failed.length > 0) {

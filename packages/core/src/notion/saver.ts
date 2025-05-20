@@ -27,13 +27,15 @@ export interface PageObject {
  */
 export class NotionPageSaver {
   private readonly outputDir: string
+  private readonly logRecursive: boolean
 
   /**
    * 创建 NotionPageSaver 实例
-   * @param outputDir 输出目录路径
+   * @param opt
    */
-  constructor(outputDir: string) {
-    this.outputDir = outputDir
+  constructor(opt: { outputDir: string; logRecursive?: boolean }) {
+    this.outputDir = opt.outputDir
+    this.logRecursive = opt.logRecursive || false
   }
 
   /**
@@ -89,7 +91,8 @@ export class NotionPageSaver {
       // 3. 构建完整页面数据
       const fullData = { ...pageData, children }
       // 调试输出
-      console.log('[savePageRecursively] 当前pageId:', pageId, 'parentPageIds:', parentPageIds)
+      if (this.logRecursive)
+        console.log('[savePageRecursively] 当前pageId:', pageId, 'parentPageIds:', parentPageIds)
       // 4. 保存当前页面
       const saveResult = await this.savePageData(
         pageId,
@@ -102,10 +105,11 @@ export class NotionPageSaver {
       // 5. 查找所有子页面块，递归保存
       for (const block of children) {
         if (block.type === 'child_page' && block.id) {
-          console.log('[savePageRecursively] 发现子页面:', block.id, '父链:', [
-            ...parentPageIds,
-            pageId,
-          ])
+          if (this.logRecursive)
+            console.log('[savePageRecursively] 发现子页面:', block.id, '父链:', [
+              ...parentPageIds,
+              pageId,
+            ])
           const childResults = await this.savePageRecursively(block.id, notionApi, [
             ...parentPageIds,
             pageId,
@@ -142,7 +146,15 @@ export class NotionPageSaver {
       const formattedPageId = this.formatPageId(pageId)
       const pageDir = path.join(this.outputDir, ...formattedIds, formattedPageId)
       // 调试输出
-      console.log('[savePageData] 保存页面:', pageId, '父链:', parentPageIds, '保存目录:', pageDir)
+      if (this.logRecursive)
+        console.log(
+          '[savePageData] 保存页面:',
+          pageId,
+          '父链:',
+          parentPageIds,
+          '保存目录:',
+          pageDir
+        )
       await mkdir(pageDir, { recursive: true })
       const fileName = `${formattedPageId}.json`
       const filePath = path.join(pageDir, fileName)

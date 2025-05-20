@@ -2,7 +2,6 @@ import { config } from 'dotenv'
 import { readFileSync, existsSync, writeFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { Config, ConfigSchema, ApiKeyInfo, ApiKeySource } from '../types'
-import { DEFAULT_CONFIG } from '../defaults'
 import { register } from 'ts-node'
 
 export class ConfigLoader {
@@ -108,23 +107,19 @@ export class ConfigLoader {
       return this.config
     }
 
-    // 1. 加载默认配置
-    const defaultConfig = DEFAULT_CONFIG
-
-    // 2. 加载配置文件
+    // 1. 加载配置文件
     const fileConfig = this.loadConfigFile()
 
-    // 3. 加载 rc 文件
+    // 2. 加载 rc 文件
     const rcConfig = this.loadRcFile()
 
-    // 4. 合并配置（优先级：rc文件 > 配置文件 > 默认配置）
+    // 3. 合并配置（优先级：rc文件 > 配置文件）
     const mergedConfig = {
-      ...defaultConfig,
       ...fileConfig,
       ...rcConfig,
     }
 
-    // 5. 验证配置
+    // 4. 验证配置并应用默认值
     const result = ConfigSchema.safeParse(mergedConfig)
 
     if (!result.success) {
