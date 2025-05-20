@@ -1,4 +1,4 @@
-import { writeFile, mkdir } from 'fs/promises'
+import { writeFile, mkdir, readFile } from 'fs/promises'
 import path from 'path'
 import { NotionBlock } from './page'
 
@@ -71,6 +71,48 @@ export class NotionPageSaver {
   }
 
   /**
+   * 检查页面是否需要更新
+   * @param pageId 页面ID
+   * @param lastEditedTime 页面的最后编辑时间
+   * @param parentPageIds 父页面ID链
+   * @returns 是否需要更新
+   */
+  private async shouldUpdatePage(
+    pageId: string,
+    lastEditedTime: string,
+    parentPageIds: string[] = []
+  ): Promise<boolean> {
+    try {
+      const formattedIds = parentPageIds.map(id => this.formatPageId(id))
+      const formattedPageId = this.formatPageId(pageId)
+      const pageDir = path.join(this.outputDir, ...formattedIds, formattedPageId)
+      const filePath = path.join(pageDir, `${formattedPageId}.json`)
+
+      // 检查文件是否存在
+      try {
+        const fileContent = await readFile(filePath, 'utf-8')
+        const localData = JSON.parse(fileContent)
+        
+        // 比较最后编辑时间
+        const needsUpdate = localData.last_edited_time !== lastEditedTime
+        console.log(
+          `[缓存检查] 页面 ${pageId}:\n` +
+          `  本地时间: ${localData.last_edited_time}\n` +
+          `  远程时间: ${lastEditedTime}\n` +
+          `  需要更新: ${needsUpdate ? '是' : '否'}`
+        )
+        return needsUpdate
+      } catch (error) {
+        console.log(`[缓存检查] 页面 ${pageId} 本地文件不存在，需要更新`)
+        return true
+      }
+    } catch (error) {
+      console.log(`[缓存检查] 页面 ${pageId} 检查过程出错，需要更新`)
+      return true
+    }
+  }
+
+  /**
    * 递归保存页面及其所有子页面，支持多层级嵌套
    * @param pageId 页面ID
    * @param notionApi NotionApi 实例
@@ -84,16 +126,63 @@ export class NotionPageSaver {
   ): Promise<SaveResult[]> {
     const results: SaveResult[] = []
     try {
-      // 1. 获取页面数据
+      console.log(`\n[开始处理] 页面 ${pageId}${parentPageIds.length > 0 ? ` (父页面: ${parentPageIds.join(' -> ')})` : ''}`)
+      
+      // 1. 获取页面基本信息
+      console.log(`[网络请求] 获取页面 ${pageId} 的基本信息`)
       const pageData = await notionApi.getPage(pageId)
-      // 2. 获取所有子块（含子页面）
+      
+      // 2. 检查是否需要更新
+      const needsUpdate = await this.shouldUpdatePage(
+        pageId,
+        pageData.last_edited_time,
+        parentPageIds
+      )
+
+      if (!needsUpdate) {
+        console.log(`[使用缓存] 页面 ${pageId} 使用本地缓存`)
+        // 如果不需要更新，直接返回成功结果
+        const formattedIds = parentPageIds.map(id => this.formatPageId(id))
+        const formattedPageId = this.formatPageId(pageId)
+        const filePath = path.join(
+          this.outputDir,
+          ...formattedIds,
+          formattedPageId,
+          `${formattedPageId}.json`
+        )
+        
+        results.push({
+          success: true,
+          filePath
+        })
+        
+        // 继续处理子页面
+        console.log(`[网络请求] 获取页面 ${pageId} 的子页面列表`)
+        const children = await notionApi.getBlockChildren(pageId)
+        for (const block of children) {
+          if (block.type === 'child_page' && block.id) {
+            if (this.logRecursive)
+              console.log('[发现子页面]', block.id, '父链:', [
+                ...parentPageIds,
+                pageId,
+              ])
+            const childResults = await this.savePageRecursively(block.id, notionApi, [
+              ...parentPageIds,
+              pageId,
+            ])
+            results.push(...childResults)
+          }
+        }
+        return results
+      }
+
+      // 3. 如果需要更新，获取完整数据
+      console.log(`[网络请求] 页面 ${pageId} 需要更新，获取完整内容`)
       const children = await notionApi.getBlockChildren(pageId)
-      // 3. 构建完整页面数据
       const fullData = { ...pageData, children }
-      // 调试输出
-      if (this.logRecursive)
-        console.log('[savePageRecursively] 当前pageId:', pageId, 'parentPageIds:', parentPageIds)
+
       // 4. 保存当前页面
+      console.log(`[保存文件] 保存页面 ${pageId} 的完整内容`)
       const saveResult = await this.savePageData(
         pageId,
         fullData,
@@ -102,11 +191,12 @@ export class NotionPageSaver {
       )
       results.push(saveResult)
       if (!saveResult.success) return results
-      // 5. 查找所有子页面块，递归保存
+
+      // 5. 处理子页面
       for (const block of children) {
         if (block.type === 'child_page' && block.id) {
           if (this.logRecursive)
-            console.log('[savePageRecursively] 发现子页面:', block.id, '父链:', [
+            console.log('[发现子页面]', block.id, '父链:', [
               ...parentPageIds,
               pageId,
             ])
@@ -118,6 +208,7 @@ export class NotionPageSaver {
         }
       }
     } catch (error) {
+      console.log(`[错误] 处理页面 ${pageId} 时发生错误:`, error instanceof Error ? error.message : String(error))
       results.push({
         success: false,
         error: error instanceof Error ? error.message : String(error),
