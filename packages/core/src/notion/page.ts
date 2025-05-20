@@ -14,7 +14,8 @@ export interface GetFullPageDataOptions {
 export async function getAllBlocks(
   api: NotionApi,
   blockId: string,
-  options?: GetFullPageDataOptions
+  options?: GetFullPageDataOptions,
+  parentPageId?: string
 ): Promise<NotionBlock[]> {
   const blocks: NotionBlock[] = []
 
@@ -30,14 +31,14 @@ export async function getAllBlocks(
 
         // 处理子页面
         if (block.type === 'child_page') {
-          // 获取子页面的完整数据，传入 isSubPage = true
-          const childPageData = await getFullPageData(api, block.id, options, true)
+          // 获取子页面的完整数据
+          const childPageData = await getFullPageData(api, block.id, options, blockId)
 
           // 如果需要保存到文件
           if (options?.saveToFile && options?.outputDir) {
             const saver = new NotionPageSaver(options.outputDir)
-            // 保存子页面到 sub_pages 目录
-            await saver.saveSubPage(blockId, block.id, childPageData)
+            // 保存子页面到父页面目录下
+            await saver.savePageData(block.id, childPageData, blockId)
           }
 
           // 在父页面中只保留子页面的基本信息
@@ -63,7 +64,7 @@ export async function getAllBlocks(
         }
         // 处理其他有子块的类型
         else if ('has_children' in block && block.has_children) {
-          blockWithChildren.children = await getAllBlocks(api, block.id, options)
+          blockWithChildren.children = await getAllBlocks(api, block.id, options, parentPageId)
         }
 
         blocks.push(blockWithChildren)
@@ -82,20 +83,20 @@ export async function getFullPageData(
   api: NotionApi,
   pageId: string,
   options?: GetFullPageDataOptions,
-  isSubPage: boolean = false
+  parentPageId?: string
 ) {
   const pageData = await api.getPage(pageId)
-  const blocks = await getAllBlocks(api, pageData.id, options)
+  const blocks = await getAllBlocks(api, pageData.id, options, parentPageId)
 
   const fullData = {
     ...pageData,
     children: blocks,
   }
 
-  // 只在非子页面且需要保存时，保存到根目录
-  if (!isSubPage && options?.saveToFile && options?.outputDir) {
+  // 保存页面数据
+  if (options?.saveToFile && options?.outputDir) {
     const saver = new NotionPageSaver(options.outputDir)
-    const saveResult = await saver.savePageData(pageId, fullData)
+    const saveResult = await saver.savePageData(pageId, fullData, parentPageId)
 
     if (!saveResult.success) {
       throw new Error(`保存页面数据失败: ${saveResult.error}`)

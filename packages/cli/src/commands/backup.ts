@@ -1,7 +1,7 @@
 import { Command } from 'commander'
 import path from 'path'
 import { Config, ConfigLoader } from '@notion2all/config'
-import { createNotionApi, getFullPageData } from '@notion2all/core'
+import { createNotionApi, NotionPageSaver, SaveResult } from '@notion2all/core'
 import { log, errorLog, LogLevel, successLog, warningLog } from '../utils'
 
 export const backupCommand = (program: Command) => {
@@ -77,19 +77,23 @@ export const backupCommand = (program: Command) => {
             try {
               const pageId = typeof page === 'string' ? page : page.id
               log(`处理页面 ${pageId}...`, LogLevel.level2)
-              
-              const pageWithBlocks = await getFullPageData(
-                notionApi,
-                pageId,
-                {
-                  saveToFile: true,
-                  outputDir: config.outputDir
-                }
-              )
-              
-              successLog(`页面 ${pageId} 备份成功`, LogLevel.level2)
+
+              const saver = new NotionPageSaver(config.outputDir)
+              const results: SaveResult[] = await saver.savePageRecursively(pageId, notionApi)
+              const failed = results.filter((r: SaveResult) => !r.success)
+              if (failed.length > 0) {
+                errorLog(
+                  `页面 ${pageId} 备份部分失败: ${failed.map((f: SaveResult) => f.error).join('; ')}`,
+                  LogLevel.level2
+                )
+              } else {
+                successLog(`页面 ${pageId} 备份成功`, LogLevel.level2)
+              }
             } catch (error) {
-              errorLog(`处理页面 ${typeof page === 'string' ? page : page.id} 失败: ${error instanceof Error ? error.message : String(error)}`, LogLevel.level1)
+              errorLog(
+                `处理页面 ${typeof page === 'string' ? page : page.id} 失败: ${error instanceof Error ? error.message : String(error)}`,
+                LogLevel.level1
+              )
             }
           }
         } else {

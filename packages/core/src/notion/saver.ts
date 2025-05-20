@@ -46,9 +46,9 @@ export class NotionPageSaver {
     if (pageId.includes('-')) {
       return pageId
     }
-    
+
     // 将不带连字符的 ID 转换为带连字符的格式
-    // 例如：1664f1d48d2b80f9929ad415aa88b822 -> 1664f1d4-8d2b-80f9-929a-d415aa88b822
+    // E.g. 1664f1d48d2b80f9929ad415aa88b822 -> 1664f1d4-8d2b-80f9-929a-d415aa88b822
     return pageId.replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, '$1-$2-$3-$4-$5')
   }
 
@@ -69,62 +69,84 @@ export class NotionPageSaver {
   }
 
   /**
-   * 保存页面数据到文件
+   * 递归保存页面及其所有子页面，支持多层级嵌套
    * @param pageId 页面ID
-   * @param data 页面数据
-   * @returns 保存结果
+   * @param notionApi NotionApi 实例
+   * @param parentPageIds 父页面ID链（从根到父），默认[]
+   * @returns 所有保存结果数组
    */
-  async savePageData(pageId: string, data: PageObject): Promise<SaveResult> {
+  async savePageRecursively(
+    pageId: string,
+    notionApi: any,
+    parentPageIds: string[] = []
+  ): Promise<SaveResult[]> {
+    const results: SaveResult[] = []
     try {
-      await this.ensureOutputDir()
-
-      const formattedPageId = this.formatPageId(pageId)
-      const pageDir = path.join(this.outputDir, formattedPageId)
-      await mkdir(pageDir, { recursive: true })
-
-      const fileName = `${formattedPageId}.json`
-      const filePath = path.join(pageDir, fileName)
-
-      await writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8')
-
-      return {
-        success: true,
-        filePath,
+      // 1. 获取页面数据
+      const pageData = await notionApi.getPage(pageId)
+      // 2. 获取所有子块（含子页面）
+      const children = await notionApi.getBlockChildren(pageId)
+      // 3. 构建完整页面数据
+      const fullData = { ...pageData, children }
+      // 调试输出
+      console.log('[savePageRecursively] 当前pageId:', pageId, 'parentPageIds:', parentPageIds)
+      // 4. 保存当前页面
+      const saveResult = await this.savePageData(
+        pageId,
+        fullData,
+        parentPageIds.length > 0 ? parentPageIds[parentPageIds.length - 1] : undefined,
+        parentPageIds
+      )
+      results.push(saveResult)
+      if (!saveResult.success) return results
+      // 5. 查找所有子页面块，递归保存
+      for (const block of children) {
+        if (block.type === 'child_page' && block.id) {
+          console.log('[savePageRecursively] 发现子页面:', block.id, '父链:', [
+            ...parentPageIds,
+            pageId,
+          ])
+          const childResults = await this.savePageRecursively(block.id, notionApi, [
+            ...parentPageIds,
+            pageId,
+          ])
+          results.push(...childResults)
+        }
       }
     } catch (error) {
-      return {
+      results.push({
         success: false,
         error: error instanceof Error ? error.message : String(error),
-      }
+      })
     }
+    return results
   }
 
   /**
-   * 保存子页面数据到文件
-   * @param parentPageId 父页面ID
-   * @param subPageId 子页面ID
-   * @param data 子页面数据
+   * 保存页面数据到文件
+   * @param pageId 页面ID
+   * @param data 页面数据
+   * @param parentPageId 父页面ID（可选）
+   * @param parentPageIds 父页面ID链（从根到父），默认[]
    * @returns 保存结果
    */
-  async saveSubPage(
-    parentPageId: string,
-    subPageId: string,
-    data: PageObject
+  async savePageData(
+    pageId: string,
+    data: PageObject,
+    parentPageId?: string,
+    parentPageIds: string[] = []
   ): Promise<SaveResult> {
     try {
       await this.ensureOutputDir()
-
-      const formattedParentPageId = this.formatPageId(parentPageId)
-      const formattedSubPageId = this.formatPageId(subPageId)
-      
-      const subPagesDir = path.join(this.outputDir, formattedParentPageId, 'sub_pages')
-      await mkdir(subPagesDir, { recursive: true })
-
-      const fileName = `${formattedSubPageId}.json`
-      const filePath = path.join(subPagesDir, fileName)
-
+      const formattedIds = parentPageIds.map(id => this.formatPageId(id))
+      const formattedPageId = this.formatPageId(pageId)
+      const pageDir = path.join(this.outputDir, ...formattedIds, formattedPageId)
+      // 调试输出
+      console.log('[savePageData] 保存页面:', pageId, '父链:', parentPageIds, '保存目录:', pageDir)
+      await mkdir(pageDir, { recursive: true })
+      const fileName = `${formattedPageId}.json`
+      const filePath = path.join(pageDir, fileName)
       await writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8')
-
       return {
         success: true,
         filePath,
