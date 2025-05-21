@@ -4,7 +4,6 @@ import type { ClientOptions } from '@notionhq/client/build/src/client'
 import type {
   PageObjectResponse,
   DatabaseObjectResponse,
-  BlockObjectResponse,
 } from '@notionhq/client/build/src/api-endpoints'
 
 export interface NotionApiConfig {
@@ -58,4 +57,4 @@ export class NotionApi {
 
 export function createNotionApi(config: NotionApiConfig): NotionApi {
   return new NotionApi(config)
-} 
+}

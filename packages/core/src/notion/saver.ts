@@ -92,14 +92,14 @@ export class NotionPageSaver {
       try {
         const fileContent = await readFile(filePath, 'utf-8')
         const localData = JSON.parse(fileContent)
-        
+
         // 比较最后编辑时间
         const needsUpdate = localData.last_edited_time !== lastEditedTime
         console.log(
           `[缓存检查] 页面 ${pageId}:\n` +
-          `  本地时间: ${localData.last_edited_time}\n` +
-          `  远程时间: ${lastEditedTime}\n` +
-          `  需要更新: ${needsUpdate ? '是' : '否'}`
+            `  本地时间: ${localData.last_edited_time}\n` +
+            `  远程时间: ${lastEditedTime}\n` +
+            `  需要更新: ${needsUpdate ? '是' : '否'}`
         )
         return needsUpdate
       } catch (error) {
@@ -110,6 +110,35 @@ export class NotionPageSaver {
       console.log(`[缓存检查] 页面 ${pageId} 检查过程出错，需要更新`)
       return true
     }
+  }
+
+  /**
+   * 处理子页面
+   * @param children 子页面列表
+   * @param pageId 当前页面ID
+   * @param notionApi NotionApi 实例
+   * @param parentPageIds 父页面ID链
+   * @returns 所有保存结果数组
+   */
+  private async processChildPages(
+    children: any[],
+    pageId: string,
+    notionApi: any,
+    parentPageIds: string[]
+  ): Promise<SaveResult[]> {
+    const results: SaveResult[] = []
+    for (const block of children) {
+      if (block.type === 'child_page' && block.id) {
+        if (this.logRecursive)
+          console.log('[发现子页面]', block.id, '父链:', [...parentPageIds, pageId])
+        const childResults = await this.savePageRecursively(block.id, notionApi, [
+          ...parentPageIds,
+          pageId,
+        ])
+        results.push(...childResults)
+      }
+    }
+    return results
   }
 
   /**
@@ -126,12 +155,14 @@ export class NotionPageSaver {
   ): Promise<SaveResult[]> {
     const results: SaveResult[] = []
     try {
-      console.log(`\n[开始处理] 页面 ${pageId}${parentPageIds.length > 0 ? ` (父页面: ${parentPageIds.join(' -> ')})` : ''}`)
-      
+      console.log(
+        `\n[开始处理] 页面 ${pageId}${parentPageIds.length > 0 ? ` (父页面: ${parentPageIds.join(' -> ')})` : ''}`
+      )
+
       // 1. 获取页面基本信息
       console.log(`[网络请求] 获取页面 ${pageId} 的基本信息`)
       const pageData = await notionApi.getPage(pageId)
-      
+
       // 2. 检查是否需要更新
       const needsUpdate = await this.shouldUpdatePage(
         pageId,
@@ -150,29 +181,22 @@ export class NotionPageSaver {
           formattedPageId,
           `${formattedPageId}.json`
         )
-        
+
         results.push({
           success: true,
-          filePath
+          filePath,
         })
-        
+
         // 继续处理子页面
         console.log(`[网络请求] 获取页面 ${pageId} 的子页面列表`)
         const children = await notionApi.getBlockChildren(pageId)
-        for (const block of children) {
-          if (block.type === 'child_page' && block.id) {
-            if (this.logRecursive)
-              console.log('[发现子页面]', block.id, '父链:', [
-                ...parentPageIds,
-                pageId,
-              ])
-            const childResults = await this.savePageRecursively(block.id, notionApi, [
-              ...parentPageIds,
-              pageId,
-            ])
-            results.push(...childResults)
-          }
-        }
+        const childResults = await this.processChildPages(
+          children,
+          pageId,
+          notionApi,
+          parentPageIds
+        )
+        results.push(...childResults)
         return results
       }
 
@@ -193,22 +217,13 @@ export class NotionPageSaver {
       if (!saveResult.success) return results
 
       // 5. 处理子页面
-      for (const block of children) {
-        if (block.type === 'child_page' && block.id) {
-          if (this.logRecursive)
-            console.log('[发现子页面]', block.id, '父链:', [
-              ...parentPageIds,
-              pageId,
-            ])
-          const childResults = await this.savePageRecursively(block.id, notionApi, [
-            ...parentPageIds,
-            pageId,
-          ])
-          results.push(...childResults)
-        }
-      }
+      const childResults = await this.processChildPages(children, pageId, notionApi, parentPageIds)
+      results.push(...childResults)
     } catch (error) {
-      console.log(`[错误] 处理页面 ${pageId} 时发生错误:`, error instanceof Error ? error.message : String(error))
+      console.log(
+        `[错误] 处理页面 ${pageId} 时发生错误:`,
+        error instanceof Error ? error.message : String(error)
+      )
       results.push({
         success: false,
         error: error instanceof Error ? error.message : String(error),
