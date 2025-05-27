@@ -33,6 +33,11 @@ export const BackupConfigSchema = z.object({
    * 是否递归下载子页面 - 默认 true
    */
   recursive: z.boolean().default(true),
+  /**
+   * 是否开启页面下载缓存机制 = 默认 true
+   * 在outputDir下元数据无篡改情况下，根据修改时间判断是否重新下载
+   */
+  enableCache: z.boolean().default(true),
 
   /**
    * 是否显示递归下载的日志信息 - 默认 false

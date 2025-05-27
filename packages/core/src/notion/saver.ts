@@ -128,6 +128,7 @@ export class NotionPageSaver {
   ): Promise<SaveResult[]> {
     const results: SaveResult[] = []
     for (const block of children) {
+      // 处理子页面
       if (block.type === 'child_page' && block.id) {
         if (this.logRecursive)
           console.log('[发现子页面]', block.id, '父链:', [...parentPageIds, pageId])
@@ -136,6 +137,36 @@ export class NotionPageSaver {
           pageId,
         ])
         results.push(...childResults)
+      }
+      // 处理其他类型的子块
+      else if (block.has_children && block.id) {
+        if (this.logRecursive)
+          console.log('[发现子块]', block.id, '类型:', block.type, '父链:', [
+            ...parentPageIds,
+            pageId,
+          ])
+        try {
+          const childBlocks = await notionApi.getBlockChildren(block.id)
+          if (childBlocks && Array.isArray(childBlocks) && childBlocks.length > 0) {
+            // 递归处理子块的子块
+            const childResults = await this.processChildPages(childBlocks, block.id, notionApi, [
+              ...parentPageIds,
+              pageId,
+            ])
+            results.push(...childResults)
+
+            // 将子块数据保存到父块中
+            block.children = childBlocks.map(childBlock => ({
+              ...childBlock,
+              children: childBlock.has_children ? childBlock.children || [] : [],
+            }))
+          }
+        } catch (error) {
+          console.error(
+            `[错误] 处理子块 ${block.id} 时发生错误:`,
+            error instanceof Error ? error.message : String(error)
+          )
+        }
       }
     }
     return results
@@ -203,7 +234,18 @@ export class NotionPageSaver {
       // 3. 如果需要更新，获取完整数据
       console.log(`[网络请求] 页面 ${pageId} 需要更新，获取完整内容`)
       const children = await notionApi.getBlockChildren(pageId)
-      const fullData = { ...pageData, children }
+
+      // 处理子块，确保获取所有子块数据
+      await this.processChildPages(children, pageId, notionApi, parentPageIds)
+
+      // 构建完整的页面数据，包含所有子块
+      const fullData = {
+        ...pageData,
+        children: children.map((block: any) => ({
+          ...block,
+          children: block.has_children ? block.children || [] : [],
+        })),
+      }
 
       // 4. 保存当前页面
       console.log(`[保存文件] 保存页面 ${pageId} 的完整内容`)

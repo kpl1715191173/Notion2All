@@ -20,9 +20,20 @@ export async function getAllBlocks(
   const blocks: NotionBlock[] = []
 
   try {
+    console.log(
+      `[网络请求] 获取block ${blockId} 的子blocks${parentPageId ? ` (父页面: ${parentPageId})` : ''}`
+    )
     const children = await api.getBlockChildren(blockId)
 
+    // 检查是否成功获取到子块数据
+    if (!children || !Array.isArray(children)) {
+      console.warn(`[警告] block ${blockId} 的子blocks数据格式不正确`)
+      return blocks
+    }
+    console.log(`[网络请求] block ${blockId} 获取到 ${children.length} 个子blocks`)
+
     for (const block of children) {
+      console.log(block)
       if ('type' in block) {
         const blockWithChildren: NotionBlock = {
           ...(block as BlockObjectResponse),
@@ -31,6 +42,7 @@ export async function getAllBlocks(
 
         // 处理子页面
         if (block.type === 'child_page') {
+          console.log(`[处理] block ${block.id} 是子页面，开始获取完整内容`)
           // 获取子页面的完整数据
           const childPageData = await getFullPageData(api, block.id, options, blockId)
 
@@ -61,16 +73,37 @@ export async function getAllBlocks(
           } as unknown as NotionBlock
 
           blockWithChildren.children = [childPageBlock]
+          console.log(`[完成] block ${block.id} 子页面处理完成`)
         }
         // 处理其他有子块的类型
-        else if ('has_children' in block && block.has_children) {
-          blockWithChildren.children = await getAllBlocks(api, block.id, options, parentPageId)
+        else if (block?.has_children) {
+          console.log(`[处理] block ${block.id} 包含子块，类型: ${block.type}`)
+          try {
+            // 获取子块数据
+            const childBlocks = await getAllBlocks(api, block.id, options, parentPageId)
+
+            // 检查子块数据是否有效
+            if (childBlocks && Array.isArray(childBlocks) && childBlocks.length > 0) {
+              console.log(`[完成] block ${block.id} 获取到 ${childBlocks.length} 个子块`)
+              blockWithChildren.children = childBlocks
+            } else {
+              console.warn(`[警告] block ${block.id} 标记为有子块，但未获取到子块数据`)
+            }
+          } catch (error) {
+            console.error(
+              `[错误] block ${block.id} 获取子块失败: ${error instanceof Error ? error.message : String(error)}`
+            )
+            // 继续处理其他块，不中断整个流程
+          }
         }
 
         blocks.push(blockWithChildren)
       }
     }
   } catch (error) {
+    console.error(
+      `[错误] block ${blockId} 获取子blocks失败: ${error instanceof Error ? error.message : String(error)}`
+    )
     throw new Error(
       `获取block ${blockId} 的子blocks失败: ${error instanceof Error ? error.message : String(error)}`
     )

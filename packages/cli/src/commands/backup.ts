@@ -16,7 +16,7 @@ export const backupCommand = (program: Command) => {
     .option('--no-recursive', 'Do not recursively backup child pages')
     .action(async options => {
       try {
-        const summartMsg = await createBox({
+        const summaryMsg = await createBox({
           title: 'Notion2All备份程序',
           content: [
             '欢迎使用 Notion2All 备份程序',
@@ -25,7 +25,7 @@ export const backupCommand = (program: Command) => {
           ],
           padding: { left: 10, right: 10 },
         })
-        log(summartMsg, LogLevel.level0)
+        log(summaryMsg, LogLevel.level0)
         log('\n')
 
         /**
@@ -55,12 +55,18 @@ export const backupCommand = (program: Command) => {
         log(`📁 配置文件路径: ${configLoader.getConfigPath()}`, LogLevel.level1)
         log('⚙️ 配置信息:', LogLevel.level1)
 
-        const boxedConfig = await createBox({
+        const logConfig: string[] = []
+        if (config.logRecursive) logConfig.push('递归下载的日志信息')
+        const configMsg = await createBox({
           title: '配置信息',
           content: [
+            '📶 基本配置:',
             `📂 输出目录: ${config.outputDir}`,
             `📎 附件处理: ${config.includeAttachments}`,
             `🔄 递归备份: ${config.recursive ? '是' : '否'}`,
+            '',
+            '📶 Log输出配置:',
+            logConfig.length > 0 ? logConfig.join('\n') : '无',
           ],
           padding: { left: 5, right: 5 },
           options: {
@@ -68,7 +74,7 @@ export const backupCommand = (program: Command) => {
           },
         })
 
-        log(boxedConfig, LogLevel.level1)
+        log(configMsg, LogLevel.level1)
 
         log(JSON.stringify(config, null, 2), LogLevel.level1)
 
