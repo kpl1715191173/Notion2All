@@ -6,7 +6,7 @@ import { register } from 'ts-node'
 
 export class ConfigLoader {
   private static instance: ConfigLoader
-  private config: Config | null = null
+  private config!: Config
   private configPath: string | null = null
   private rcFilePath: string | null = null
 
