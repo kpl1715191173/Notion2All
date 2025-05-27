@@ -1,6 +1,12 @@
 import { Command } from 'commander'
 import { Config, ConfigLoader } from '@notion2all/config'
-import { createNotionApi, NotionPageSaver, SaveResult } from '@notion2all/core'
+import {
+  createNotionApi,
+  NotionPageCoordinator,
+  NotionDataFetcher,
+  NotionCacheService,
+  NotionPageSaver,
+} from '@notion2all/core'
 import { log, errorLog, LogLevel, successLog, warningLog } from '../utils'
 import { createBox } from '../utils/boxen'
 
@@ -14,6 +20,7 @@ export const backupCommand = (program: Command) => {
     .option('-a, --attachments <type>', 'Attachment handling (all, onlyPic)')
     .option('-r, --recursive', 'Recursively backup child pages')
     .option('--no-recursive', 'Do not recursively backup child pages')
+    .option('-l, --log-recursive', '是否记录递归过程')
     .action(async options => {
       try {
         const summaryMsg = await createBox({
@@ -53,20 +60,19 @@ export const backupCommand = (program: Command) => {
         }
 
         log(`📁 配置文件路径: ${configLoader.getConfigPath()}`, LogLevel.level1)
-        log('⚙️ 配置信息:', LogLevel.level1)
 
         const logConfig: string[] = []
-        if (config.logRecursive) logConfig.push('递归下载的日志信息')
+        if (config.logRecursive) logConfig.push(' ▫ 递归下载的日志信息')
         const configMsg = await createBox({
           title: '配置信息',
           content: [
             '📶 基本配置:',
-            `📂 输出目录: ${config.outputDir}`,
-            `📎 附件处理: ${config.includeAttachments}`,
-            `🔄 递归备份: ${config.recursive ? '是' : '否'}`,
+            ` 📂 输出目录: ${config.outputDir}`,
+            ` 📎 附件处理: ${config.includeAttachments}`,
+            ` 🔄 递归备份: ${config.recursive ? '是' : '否'}`,
             '',
             '📶 Log输出配置:',
-            logConfig.length > 0 ? logConfig.join('\n') : '无',
+            logConfig.length > 0 ? logConfig.join('\n') : ' 无',
           ],
           padding: { left: 5, right: 5 },
           options: {
@@ -99,19 +105,24 @@ export const backupCommand = (program: Command) => {
               const pageId = typeof page === 'string' ? page : page.id
               log(`处理页面 ${pageId}...`, LogLevel.level2)
 
-              const saver = new NotionPageSaver({
-                outputDir: config.outputDir,
-                logRecursive: config.logRecursive,
-              })
-              const results: SaveResult[] = await saver.savePageRecursively(pageId, notionApi)
-              const failed = results.filter((r: SaveResult) => !r.success)
-              if (failed.length > 0) {
+              // 创建所需的服务实例
+              const fetcher = new NotionDataFetcher(notionApi)
+              const cacheService = new NotionCacheService(config.outputDir)
+              const saver = new NotionPageSaver(config.outputDir)
+
+              // 创建协调器实例
+              const coordinator = new NotionPageCoordinator(fetcher, cacheService, saver)
+
+              try {
+                // 使用协调器处理页面
+                await coordinator.processPage(pageId)
+                successLog(`页面 ${pageId} 备份完成`, LogLevel.level2)
+              } catch (error) {
                 errorLog(
-                  `页面 ${pageId} 备份部分失败: ${failed.map((f: SaveResult) => f.error).join('; ')}`,
+                  `页面 ${pageId} 备份失败: ${error instanceof Error ? error.message : String(error)}`,
                   LogLevel.level2
                 )
-              } else {
-                successLog(`页面 ${pageId} 备份成功`, LogLevel.level2)
+                throw error
               }
             } catch (error) {
               errorLog(

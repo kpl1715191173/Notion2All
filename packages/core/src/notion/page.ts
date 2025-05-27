@@ -1,11 +1,16 @@
 import { NotionApi } from './api'
 import { BlockObjectResponse } from '@notionhq/client/build/src/api-endpoints'
 import { NotionPageSaver } from './saver'
+import type { NotionBlock as NotionBlockType } from './types'
 
-export type NotionBlock = BlockObjectResponse & {
+// 使用本地类型定义
+type NotionBlock = BlockObjectResponse & {
   children?: NotionBlock[]
 }
 
+/**
+ * 获取完整页面数据的选项
+ */
 export interface GetFullPageDataOptions {
   saveToFile?: boolean
   outputDir?: string
@@ -48,9 +53,9 @@ export async function getAllBlocks(
 
           // 如果需要保存到文件
           if (options?.saveToFile && options?.outputDir) {
-            const saver = new NotionPageSaver({ outputDir: options.outputDir })
+            const saver = new NotionPageSaver(options.outputDir)
             // 保存子页面到父页面目录下
-            await saver.savePageData(block.id, childPageData, blockId)
+            await saver.savePageData(block.id, childPageData, [blockId])
           }
 
           // 在父页面中只保留子页面的基本信息
@@ -128,8 +133,12 @@ export async function getFullPageData(
 
   // 保存页面数据
   if (options?.saveToFile && options?.outputDir) {
-    const saver = new NotionPageSaver({ outputDir: options.outputDir })
-    const saveResult = await saver.savePageData(pageId, fullData, parentPageId)
+    const saver = new NotionPageSaver(options.outputDir)
+    const saveResult = await saver.savePageData(
+      pageId,
+      fullData,
+      parentPageId ? [parentPageId] : undefined
+    )
 
     if (!saveResult.success) {
       throw new Error(`保存页面数据失败: ${saveResult.error}`)
@@ -137,4 +146,32 @@ export async function getFullPageData(
   }
 
   return fullData
+}
+
+/**
+ * 格式化页面 ID，确保使用带连字符的格式
+ * @param pageId 页面ID
+ * @returns 格式化后的页面ID
+ */
+export function formatPageId(pageId: string): string {
+  if (pageId.includes('-')) return pageId
+  return pageId.replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, '$1-$2-$3-$4-$5')
+}
+
+/**
+ * 检查块是否为子页面
+ * @param block 块对象
+ * @returns 是否为子页面
+ */
+export function isChildPage(block: NotionBlock): boolean {
+  return block.type === 'child_page'
+}
+
+/**
+ * 检查块是否有子块
+ * @param block 块对象
+ * @returns 是否有子块
+ */
+export function hasChildren(block: NotionBlock): boolean {
+  return block.has_children === true
 }
