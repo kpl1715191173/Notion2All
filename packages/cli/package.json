@@ -13,6 +13,7 @@
   "dependencies": {
     "@notion2all/config": "workspace:^1.0.0",
     "@notion2all/core": "workspace:*",
+    "boxen": "^8.0.1",
     "commander": "^11.1.0"
   },
   "devDependencies": {

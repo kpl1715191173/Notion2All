@@ -2,6 +2,7 @@ import { Command } from 'commander'
 import { Config, ConfigLoader } from '@notion2all/config'
 import { createNotionApi, NotionPageSaver, SaveResult } from '@notion2all/core'
 import { log, errorLog, LogLevel, successLog, warningLog } from '../utils'
+import { createBox } from '../utils/boxen'
 
 export const backupCommand = (program: Command) => {
   program
@@ -15,12 +16,22 @@ export const backupCommand = (program: Command) => {
     .option('--no-recursive', 'Do not recursively backup child pages')
     .action(async options => {
       try {
-        log('👾 开始备份...')
+        const summartMsg = await createBox({
+          title: 'Notion2All备份程序',
+          content: [
+            '欢迎使用 Notion2All 备份程序',
+            '当前版本: 0.0.1',
+            '项目地址: https://github.com/kpl1715191173/Notion2All',
+          ],
+          padding: { left: 10, right: 10 },
+        })
+        log(summartMsg, LogLevel.level0)
+        log('\n')
 
         /**
          * ====== 加载配置 ======
          */
-        log('1️⃣正在加载配置...', LogLevel.level0)
+        log('🛑 [Step1] ------------------ 加载配置数据 ------------------', LogLevel.level0)
         const configLoader = ConfigLoader.getInstance()
         const config = await configLoader.load()
 
@@ -44,24 +55,29 @@ export const backupCommand = (program: Command) => {
         log(`📁 配置文件路径: ${configLoader.getConfigPath()}`, LogLevel.level1)
         log('⚙️ 配置信息:', LogLevel.level1)
 
-        // 格式化配置信息输出
-        const formattedConfig = JSON.stringify(config, null, 2)
-          .split('\n')
-          .map((line, index) => (index === 0 ? line : `    ${line}`))
-          .join('\n')
+        const boxedConfig = await createBox({
+          title: '配置信息',
+          content: [
+            `📂 输出目录: ${config.outputDir}`,
+            `📎 附件处理: ${config.includeAttachments}`,
+            `🔄 递归备份: ${config.recursive ? '是' : '否'}`,
+          ],
+          padding: { left: 5, right: 5 },
+          options: {
+            borderStyle: 'classic',
+          },
+        })
 
-        log(formattedConfig, LogLevel.level2)
+        log(boxedConfig, LogLevel.level1)
 
-        log(`📂 输出目录: ${config.outputDir}`, LogLevel.level1)
-        log(`📎 附件处理: ${config.includeAttachments}`, LogLevel.level1)
-        log(`🔄 递归备份: ${config.recursive ? '是' : '否'}`, LogLevel.level1)
+        log(JSON.stringify(config, null, 2), LogLevel.level1)
 
         successLog('配置加载完成\n', LogLevel.level1)
 
         /**
          * ====== 备份逻辑 ======
          */
-        log('2️⃣正在开始备份...', LogLevel.level0)
+        log('🛑 [Step2] ------------------ 获取Notion数据 ------------------', LogLevel.level0)
 
         const notionApi = createNotionApi({
           auth: apiKeyInfo?.key!,
