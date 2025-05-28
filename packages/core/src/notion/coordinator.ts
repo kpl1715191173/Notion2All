@@ -4,15 +4,34 @@ import { NotionPageSaver } from './saver'
 import { PageObject } from './types'
 import { isChildPage } from './page'
 
+// 计时器工具函数
+const timer = {
+  start: () => {
+    return process.hrtime.bigint()
+  },
+  end: (startTime: bigint) => {
+    const endTime = process.hrtime.bigint()
+    const timeInMs = Number(endTime - startTime) / 1_000_000
+    return timeInMs.toFixed(2)
+  },
+}
+
 /**
  * Notion 页面协调器
  * 负责协调数据获取、缓存和保存的流程
  */
 export class NotionPageCoordinator {
+  /**
+   * @param fetcher 数据获取器
+   * @param cacheService 缓存服务
+   * @param saver 保存器
+   * @param concurrency 并发数量，0表示不使用并发
+   */
   constructor(
     private fetcher: NotionDataFetcher,
     private cacheService: NotionCacheService,
-    private saver: NotionPageSaver
+    private saver: NotionPageSaver,
+    private concurrency: number
   ) {}
 
   /**
@@ -55,9 +74,44 @@ export class NotionPageCoordinator {
       }
 
       // 5. 处理子页面
-      for (const block of fullData.children) {
-        if (isChildPage(block)) {
-          await this.processPage(block.id, [...parentPageIds, pageId])
+      const childPages = fullData.children.filter(block => isChildPage(block))
+
+      if (childPages.length > 0) {
+        console.log(`[子页面处理] ${pageId} 有 ${childPages.length} 个子页面需要处理`)
+
+        if (this.concurrency <= 0) {
+          // 传统的串行处理
+          const startTime = timer.start()
+
+          for (const block of childPages) {
+            await this.processPage(block.id, [...parentPageIds, pageId])
+          }
+
+          const timeUsed = timer.end(startTime)
+          console.log(
+            `[串行子页面] 页面 ${pageId} 的 ${childPages.length} 个子页面处理完成，耗时: ${timeUsed} ms`
+          )
+        } else {
+          // 并发处理子页面，但限制并发数
+          console.log(
+            `[并发处理] 使用并发数 ${this.concurrency} 处理 ${childPages.length} 个子页面`
+          )
+
+          const startTime = timer.start()
+
+          // 实现批量处理，避免一次性创建太多Promise
+          for (let i = 0; i < childPages.length; i += this.concurrency) {
+            const batch = childPages.slice(i, i + this.concurrency)
+            const childPromises = batch.map(block =>
+              this.processPage(block.id, [...parentPageIds, pageId])
+            )
+            await Promise.all(childPromises)
+          }
+
+          const timeUsed = timer.end(startTime)
+          console.log(
+            `[并发子页面] 页面 ${pageId} 的 ${childPages.length} 个子页面处理完成，耗时: ${timeUsed} ms`
+          )
         }
       }
     } catch (error) {

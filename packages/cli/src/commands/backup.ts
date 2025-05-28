@@ -10,6 +10,18 @@ import {
 import { log, errorLog, LogLevel, successLog, warningLog } from '../utils'
 import { createBox } from '../utils/boxen'
 
+// 计时器工具函数
+const timer = {
+  start: () => {
+    return process.hrtime.bigint()
+  },
+  end: (startTime: bigint) => {
+    const endTime = process.hrtime.bigint()
+    const timeInMs = Number(endTime - startTime) / 1_000_000
+    return timeInMs.toFixed(2)
+  },
+}
+
 export const backupCommand = (program: Command) => {
   program
     .command('backup')
@@ -21,6 +33,7 @@ export const backupCommand = (program: Command) => {
     .option('-r, --recursive', 'Recursively backup child pages')
     .option('--no-recursive', 'Do not recursively backup child pages')
     .option('-l, --log-recursive', '是否记录递归过程')
+    .option('-c, --concurrency <number>', '并发处理页面的数量 (0表示串行处理)')
     .action(async options => {
       try {
         const summaryMsg = await createBox({
@@ -58,6 +71,9 @@ export const backupCommand = (program: Command) => {
         if (options.pageId && config.pages.length === 0) {
           config.pages = [options.pageId]
         }
+        if (options.concurrency !== undefined) {
+          config.concurrency = parseInt(options.concurrency, 10)
+        }
 
         log(`📁 配置文件路径: ${configLoader.getConfigPath()}`, LogLevel.level1)
 
@@ -70,6 +86,7 @@ export const backupCommand = (program: Command) => {
             ` 📂 输出目录: ${config.outputDir}`,
             ` 📎 附件处理: ${config.includeAttachments}`,
             ` 🔄 递归备份: ${config.recursive ? '是' : '否'}`,
+            ` 🚀 并发数量: ${config.concurrency}${config.concurrency === 0 ? ' (串行处理)' : ''}`,
             '',
             '📶 Log输出配置:',
             logConfig.length > 0 ? logConfig.join('\n') : ' 无',
@@ -100,36 +117,107 @@ export const backupCommand = (program: Command) => {
 
         if (config.pages.length > 0) {
           log('📄 备份页面:', LogLevel.level1)
-          for (const page of config.pages) {
-            try {
-              const pageId = typeof page === 'string' ? page : page.id
-              log(`处理页面 ${pageId}...`, LogLevel.level2)
 
-              // 创建所需的服务实例
-              const fetcher = new NotionDataFetcher(notionApi)
-              const cacheService = new NotionCacheService(config.outputDir)
-              const saver = new NotionPageSaver(config.outputDir)
+          // 创建共享服务实例
+          const fetcher = new NotionDataFetcher(notionApi)
+          const cacheService = new NotionCacheService(config.outputDir)
+          const saver = new NotionPageSaver(config.outputDir)
 
-              // 创建协调器实例
-              const coordinator = new NotionPageCoordinator(fetcher, cacheService, saver)
+          // 根页面并发处理
+          const concurrency = config.concurrency || 5 // 默认值为5
 
+          if (concurrency <= 0) {
+            // 串行处理根页面
+            log(`[串行处理] 开始处理 ${config.pages.length} 个根页面`, LogLevel.level1)
+            const startTime = timer.start()
+
+            for (const page of config.pages) {
               try {
-                // 使用协调器处理页面
-                await coordinator.processPage(pageId)
-                successLog(`页面 ${pageId} 备份完成`, LogLevel.level2)
+                const pageId = typeof page === 'string' ? page : page.id
+                log(`处理页面 ${pageId}...`, LogLevel.level2)
+
+                // 创建协调器实例
+                const coordinator = new NotionPageCoordinator(
+                  fetcher,
+                  cacheService,
+                  saver,
+                  concurrency
+                )
+
+                try {
+                  await coordinator.processPage(pageId)
+                  successLog(`页面 ${pageId} 备份完成`, LogLevel.level2)
+                } catch (error) {
+                  errorLog(
+                    `页面 ${pageId} 备份失败: ${error instanceof Error ? error.message : String(error)}`,
+                    LogLevel.level2
+                  )
+                  throw error
+                }
               } catch (error) {
                 errorLog(
-                  `页面 ${pageId} 备份失败: ${error instanceof Error ? error.message : String(error)}`,
-                  LogLevel.level2
+                  `处理页面 ${typeof page === 'string' ? page : page.id} 失败: ${error instanceof Error ? error.message : String(error)}`,
+                  LogLevel.level1
                 )
-                throw error
               }
-            } catch (error) {
-              errorLog(
-                `处理页面 ${typeof page === 'string' ? page : page.id} 失败: ${error instanceof Error ? error.message : String(error)}`,
-                LogLevel.level1
-              )
             }
+
+            const timeUsed = timer.end(startTime)
+            successLog(
+              `[串行处理] 完成处理 ${config.pages.length} 个根页面，耗时: ${timeUsed} ms`,
+              LogLevel.level1
+            )
+          } else {
+            // 并发处理根页面，但限制并发数
+            log(
+              `[并发处理] 使用并发数 ${concurrency} 处理 ${config.pages.length} 个根页面`,
+              LogLevel.level1
+            )
+            const startTime = timer.start()
+
+            // 分批处理根页面
+            for (let i = 0; i < config.pages.length; i += concurrency) {
+              const batch = config.pages.slice(i, i + concurrency)
+
+              const pagePromises = batch.map(async page => {
+                try {
+                  const pageId = typeof page === 'string' ? page : page.id
+                  log(`处理页面 ${pageId}...`, LogLevel.level2)
+
+                  // 创建协调器实例
+                  const coordinator = new NotionPageCoordinator(
+                    fetcher,
+                    cacheService,
+                    saver,
+                    concurrency
+                  )
+
+                  try {
+                    await coordinator.processPage(pageId)
+                    successLog(`页面 ${pageId} 备份完成`, LogLevel.level2)
+                  } catch (error) {
+                    errorLog(
+                      `页面 ${pageId} 备份失败: ${error instanceof Error ? error.message : String(error)}`,
+                      LogLevel.level2
+                    )
+                  }
+                } catch (error) {
+                  errorLog(
+                    `处理页面 ${typeof page === 'string' ? page : page.id} 失败: ${error instanceof Error ? error.message : String(error)}`,
+                    LogLevel.level1
+                  )
+                }
+              })
+
+              // 等待当前批次完成
+              await Promise.all(pagePromises)
+            }
+
+            const timeUsed = timer.end(startTime)
+            successLog(
+              `[并发处理] 完成处理 ${config.pages.length} 个根页面，耗时: ${timeUsed} ms`,
+              LogLevel.level1
+            )
           }
         } else {
           warningLog('⚠️ 没有配置需要备份的页面', LogLevel.level1)

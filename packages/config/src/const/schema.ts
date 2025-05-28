@@ -43,6 +43,12 @@ export const BackupConfigSchema = z.object({
    * 是否显示递归下载的日志信息 - 默认 false
    */
   logRecursive: z.boolean().default(false),
+
+  /**
+   * 并发处理页面的数量 - 默认 5
+   * 0 表示不使用并发处理
+   */
+  concurrency: z.number().int().min(0).default(5),
 })
 
 // 认证配置
