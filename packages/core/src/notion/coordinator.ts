@@ -1,6 +1,7 @@
 import { NotionDataFetcher } from './fetcher'
 import { NotionCacheService } from './cache'
 import { NotionPageSaver } from './saver'
+import { NotionImageDownloader } from './downloader'
 import { PageObject } from './types'
 import { isChildPage } from './page'
 
@@ -21,18 +22,58 @@ const timer = {
  * 负责协调数据获取、缓存和保存的流程
  */
 export class NotionPageCoordinator {
+  private imageDownloader: NotionImageDownloader
+
   /**
    * @param fetcher 数据获取器
    * @param cacheService 缓存服务
    * @param saver 保存器
-   * @param concurrency 并发数量，0表示不使用并发
+   * @param config 配置对象
    */
   constructor(
     private fetcher: NotionDataFetcher,
     private cacheService: NotionCacheService,
     private saver: NotionPageSaver,
-    private concurrency: number
-  ) {}
+    private config: {
+      recursive?: boolean
+      includeImages?: boolean
+      concurrency?: number
+    } = {}
+  ) {
+    this.imageDownloader = new NotionImageDownloader(this.saver.getOutputDir())
+    // 设置默认值
+    this.config.recursive = this.config.recursive ?? true
+    this.config.includeImages = this.config.includeImages ?? false
+    this.config.concurrency = this.config.concurrency ?? 5
+  }
+
+  /**
+   * 从块中提取图片信息
+   * @param blocks 块数组
+   * @returns 图片信息数组
+   */
+  private extractImageUrls(blocks: any[]): Array<{ blockId: string; url: string }> {
+    const images: Array<{ blockId: string; url: string }> = []
+    
+    for (const block of blocks) {
+      if (block.type === 'image') {
+        const imageUrl = block[block.type]?.file?.url || block[block.type]?.external?.url
+        if (imageUrl) {
+          images.push({
+            blockId: block.id,
+            url: imageUrl
+          })
+        }
+      }
+      
+      // 递归处理子块
+      if (block.children && Array.isArray(block.children)) {
+        images.push(...this.extractImageUrls(block.children))
+      }
+    }
+    
+    return images
+  }
 
   /**
    * 处理页面及其子页面
@@ -73,50 +114,57 @@ export class NotionPageCoordinator {
         throw new Error(`保存页面 ${pageId} 失败: ${saveResult.error}`)
       }
 
-      // 5. 处理子页面
-      const childPages = fullData.children.filter(block => isChildPage(block))
+      // 5. 下载图片（如果配置允许）
+      if (this.config.includeImages) {
+        const imageUrls = this.extractImageUrls(fullData.children)
+        if (imageUrls.length > 0) {
+          console.log(`[下载图片] 页面 ${pageId} 发现 ${imageUrls.length} 张图片`)
+          await this.imageDownloader.saveImages(pageId, imageUrls)
+        }
+      }
 
-      if (childPages.length > 0) {
-        console.log(`[子页面处理] ${pageId} 有 ${childPages.length} 个子页面需要处理`)
+      // 6. 处理子页面
+      if (this.config.recursive) {
+        const childPages = fullData.children.filter(block => isChildPage(block))
+        if (childPages.length > 0) {
+          console.log(`[子页面处理] ${pageId} 有 ${childPages.length} 个子页面需要处理`)
 
-        if (this.concurrency <= 0) {
-          // 传统的串行处理
-          const startTime = timer.start()
-
-          for (const block of childPages) {
-            await this.processPage(block.id, [...parentPageIds, pageId])
-          }
-
-          const timeUsed = timer.end(startTime)
-          console.log(
-            `[串行子页面] 页面 ${pageId} 的 ${childPages.length} 个子页面处理完成，耗时: ${timeUsed} ms`
-          )
-        } else {
-          // 并发处理子页面，但限制并发数
-          console.log(
-            `[并发处理] 使用并发数 ${this.concurrency} 处理 ${childPages.length} 个子页面`
-          )
-
-          const startTime = timer.start()
-
-          // 实现批量处理，避免一次性创建太多Promise
-          for (let i = 0; i < childPages.length; i += this.concurrency) {
-            const batch = childPages.slice(i, i + this.concurrency)
-            const childPromises = batch.map(block =>
-              this.processPage(block.id, [...parentPageIds, pageId])
+          if (!this.config.concurrency || this.config.concurrency <= 0) {
+            // 串行处理
+            const startTime = timer.start()
+            for (const childPage of childPages) {
+              await this.processPage(childPage.id, [...parentPageIds, pageId])
+            }
+            const timeUsed = timer.end(startTime)
+            console.log(
+              `[串行子页面] 页面 ${pageId} 的 ${childPages.length} 个子页面处理完成，耗时: ${timeUsed} ms`
             )
-            await Promise.all(childPromises)
-          }
+          } else {
+            // 并发处理
+            console.log(
+              `[并发处理] 使用并发数 ${this.config.concurrency} 处理 ${childPages.length} 个子页面`
+            )
+            const startTime = timer.start()
+            
+            // 分批处理子页面
+            for (let i = 0; i < childPages.length; i += this.config.concurrency) {
+              const batch = childPages.slice(i, i + this.config.concurrency)
+              const promises = batch.map(childPage =>
+                this.processPage(childPage.id, [...parentPageIds, pageId])
+              )
+              await Promise.all(promises)
+            }
 
-          const timeUsed = timer.end(startTime)
-          console.log(
-            `[并发子页面] 页面 ${pageId} 的 ${childPages.length} 个子页面处理完成，耗时: ${timeUsed} ms`
-          )
+            const timeUsed = timer.end(startTime)
+            console.log(
+              `[并发子页面] 页面 ${pageId} 的 ${childPages.length} 个子页面处理完成，耗时: ${timeUsed} ms`
+            )
+          }
         }
       }
     } catch (error) {
       console.error(
-        `[错误] 处理页面 ${pageId} 时发生错误:`,
+        `[错误] 处理页面 ${pageId} 失败:`,
         error instanceof Error ? error.message : String(error)
       )
       throw error

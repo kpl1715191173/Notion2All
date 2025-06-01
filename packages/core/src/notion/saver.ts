@@ -1,6 +1,7 @@
 import { writeFile, mkdir } from 'fs/promises'
 import path from 'path'
 import { PageObject, SaveResult } from './types'
+import { formatId } from './utils'
 
 /**
  * Notion 页面数据保存器
@@ -10,13 +11,11 @@ export class NotionPageSaver {
   constructor(private outputDir: string) {}
 
   /**
-   * 格式化页面 ID，确保使用带连字符的格式
-   * @param pageId 页面ID
-   * @returns 格式化后的页面ID
+   * 获取输出目录路径
+   * @returns 输出目录路径
    */
-  private formatPageId(pageId: string): string {
-    if (pageId.includes('-')) return pageId
-    return pageId.replace(/(.{8})(.{4})(.{4})(.{4})(.{12})/, '$1-$2-$3-$4-$5')
+  getOutputDir(): string {
+    return this.outputDir
   }
 
   /**
@@ -49,8 +48,8 @@ export class NotionPageSaver {
     parentPageIds: string[] = []
   ): Promise<SaveResult> {
     try {
-      const formattedIds = parentPageIds.map(id => this.formatPageId(id))
-      const formattedPageId = this.formatPageId(pageId)
+      const formattedIds = parentPageIds.map(id => formatId(id))
+      const formattedPageId = formatId(pageId)
       const pageDir = path.join(this.outputDir, ...formattedIds, formattedPageId)
       const filePath = path.join(pageDir, `${formattedPageId}.json`)
 

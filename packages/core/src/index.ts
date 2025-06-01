@@ -12,6 +12,7 @@ export { NotionDataFetcher } from './notion/fetcher'
 export { NotionCacheService } from './notion/cache'
 export { NotionPageSaver } from './notion/saver'
 export { NotionPageCoordinator } from './notion/coordinator'
+export { NotionImageDownloader } from './notion/downloader'
 
 // 导出工具函数
 export { formatPageId, isChildPage, hasChildren } from './notion/page'

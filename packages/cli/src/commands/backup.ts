@@ -141,7 +141,11 @@ export const backupCommand = (program: Command) => {
                   fetcher,
                   cacheService,
                   saver,
-                  concurrency
+                  {
+                    recursive: config.recursive,
+                    includeImages: config.includeAttachments === 'onlyPic' || config.includeAttachments === 'all',
+                    concurrency: config.concurrency
+                  }
                 )
 
                 try {
@@ -189,7 +193,11 @@ export const backupCommand = (program: Command) => {
                     fetcher,
                     cacheService,
                     saver,
-                    concurrency
+                    {
+                      recursive: config.recursive,
+                      includeImages: config.includeAttachments === 'onlyPic' || config.includeAttachments === 'all',
+                      concurrency: config.concurrency
+                    }
                   )
 
                   try {
