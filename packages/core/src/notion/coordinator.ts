@@ -1,7 +1,7 @@
 import { NotionDataFetcher } from './fetcher'
 import { NotionCacheService } from './cache'
 import { NotionPageSaver } from './saver'
-import { NotionImageDownloader } from './downloader'
+import { NotionFileDownloader } from './file-downloader'
 import { PageObject } from './types'
 import { isChildPage } from './page'
 
@@ -22,7 +22,7 @@ const timer = {
  * 负责协调数据获取、缓存和保存的流程
  */
 export class NotionPageCoordinator {
-  private imageDownloader: NotionImageDownloader
+  private fileDownloader: NotionFileDownloader
 
   /**
    * @param fetcher 数据获取器
@@ -40,7 +40,7 @@ export class NotionPageCoordinator {
       concurrency?: number
     } = {}
   ) {
-    this.imageDownloader = new NotionImageDownloader(this.saver.getOutputDir())
+    this.fileDownloader = new NotionFileDownloader(this.saver.getOutputDir())
     // 设置默认值
     this.config.recursive = this.config.recursive ?? true
     this.config.includeImages = this.config.includeImages ?? false
@@ -118,8 +118,8 @@ export class NotionPageCoordinator {
       if (this.config.includeImages) {
         const imageUrls = this.extractImageUrls(fullData.children)
         if (imageUrls.length > 0) {
-          console.log(`[下载图片] 页面 ${pageId} 发现 ${imageUrls.length} 张图片`)
-          await this.imageDownloader.saveImages(pageId, imageUrls)
+          console.log(`[下载文件] 页面 ${pageId} 发现 ${imageUrls.length} 个文件`)
+          await this.fileDownloader.saveFiles(pageId, imageUrls)
         }
       }
 

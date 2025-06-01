@@ -1,6 +1,5 @@
 import { NotionApi } from './api'
 import { NotionBlock, PageObject } from './types'
-import { BlockObjectResponse } from '@notionhq/client/build/src/api-endpoints'
 
 /**
  * Notion 数据获取服务
