@@ -24,6 +24,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@notion2all/utils": "workspace:*",
     "@notionhq/client": "^2.2.14"
   },
   "devDependencies": {

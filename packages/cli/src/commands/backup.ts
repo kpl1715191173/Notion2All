@@ -2,13 +2,14 @@ import { Command } from 'commander'
 import { Config, ConfigLoader } from '@notion2all/config'
 import {
   createNotionApi,
-  NotionPageCoordinator,
-  NotionDataFetcher,
   NotionCacheService,
+  NotionDataFetcher,
+  NotionPageCoordinator,
   NotionPageSaver,
 } from '@notion2all/core'
-import { log, errorLog, LogLevel, successLog, warningLog } from '../utils'
+import { errorLog, log, successLog, warningLog } from '@notion2all/utils'
 import { createBox } from '../utils/boxen'
+import { LogLevel } from '@notion2all/utils/src'
 
 // 计时器工具函数
 const timer = {
@@ -98,9 +99,7 @@ export const backupCommand = (program: Command) => {
         })
 
         log(configMsg, LogLevel.level1)
-
         log(JSON.stringify(config, null, 2), LogLevel.level1)
-
         successLog('配置加载完成\n', LogLevel.level1)
 
         /**
@@ -196,7 +195,8 @@ export const backupCommand = (program: Command) => {
                     {
                       recursive: config.recursive,
                       includeImages: config.includeAttachments === 'onlyPic' || config.includeAttachments === 'all',
-                      concurrency: config.concurrency
+                      concurrency: config.concurrency,
+                      logLevel: LogLevel.level2
                     }
                   )
 

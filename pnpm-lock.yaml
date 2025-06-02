@@ -51,6 +51,9 @@ importers:
       '@notion2all/core':
         specifier: workspace:*
         version: link:../core
+      '@notion2all/utils':
+        specifier: workspace:*
+        version: link:../utils
       boxen:
         specifier: ^8.0.1
         version: 8.0.1
@@ -83,6 +86,9 @@ importers:
 
   packages/core:
     dependencies:
+      '@notion2all/utils':
+        specifier: workspace:*
+        version: link:../utils
       '@notionhq/client':
         specifier: ^2.2.14
         version: 2.3.0
@@ -93,6 +99,19 @@ importers:
       vitest:
         specifier: ^1.0.0
         version: 1.6.1(@types/node@20.17.46)
+
+  packages/utils:
+    dependencies:
+      boxen:
+        specifier: ^8.0.1
+        version: 8.0.1
+    devDependencies:
+      '@types/node':
+        specifier: ^20.10.0
+        version: 20.17.46
+      typescript:
+        specifier: ^5.3.2
+        version: 5.8.3
 
   packages/web:
     dependencies:

@@ -4,18 +4,7 @@ import { NotionPageSaver } from './saver'
 import { NotionFileDownloader } from './file-downloader'
 import { PageObject } from './types'
 import { isChildPage } from './page'
-
-// 计时器工具函数
-const timer = {
-  start: () => {
-    return process.hrtime.bigint()
-  },
-  end: (startTime: bigint) => {
-    const endTime = process.hrtime.bigint()
-    const timeInMs = Number(endTime - startTime) / 1_000_000
-    return timeInMs.toFixed(2)
-  },
-}
+import { notionLog, LogLevel, timer } from '@notion2all/utils'
 
 /**
  * Notion 页面协调器
@@ -38,6 +27,7 @@ export class NotionPageCoordinator {
       recursive?: boolean
       includeImages?: boolean
       concurrency?: number
+      logLevel?: LogLevel
     } = {}
   ) {
     this.fileDownloader = new NotionFileDownloader(this.saver.getOutputDir())
@@ -45,6 +35,7 @@ export class NotionPageCoordinator {
     this.config.recursive = this.config.recursive ?? true
     this.config.includeImages = this.config.includeImages ?? false
     this.config.concurrency = this.config.concurrency ?? 5
+    this.config.logLevel = this.config.logLevel ?? LogLevel.level0
   }
 
   /**
@@ -82,11 +73,7 @@ export class NotionPageCoordinator {
    */
   async processPage(pageId: string, parentPageIds: string[] = []): Promise<void> {
     try {
-      console.log(
-        `\n[开始处理] 页面 ${pageId}${
-          parentPageIds.length > 0 ? ` (父页面: ${parentPageIds.join(' -> ')})` : ''
-        }`
-      )
+      notionLog.processStart(pageId, parentPageIds, this.config.logLevel)
 
       // 1. 获取页面数据
       const pageData = await this.fetcher.fetchPageData(pageId)
@@ -99,16 +86,16 @@ export class NotionPageCoordinator {
       )
 
       if (!needsUpdate) {
-        console.log(`[使用缓存] 页面 ${pageId} 使用本地缓存`)
+        notionLog.useCache(pageId, this.config.logLevel)
         return
       }
 
       // 3. 获取完整数据
-      console.log(`[网络请求] 页面 ${pageId} 需要更新，获取完整内容`)
+      notionLog.fetchData(pageId, this.config.logLevel)
       const fullData = await this.fetcher.fetchFullPageData(pageId)
 
       // 4. 保存数据
-      console.log(`[保存文件] 保存页面 ${pageId} 的完整内容`)
+      notionLog.saveData(pageId, this.config.logLevel)
       const saveResult = await this.saver.savePageData(pageId, fullData, parentPageIds)
       if (!saveResult.success) {
         throw new Error(`保存页面 ${pageId} 失败: ${saveResult.error}`)
@@ -118,7 +105,7 @@ export class NotionPageCoordinator {
       if (this.config.includeImages) {
         const imageUrls = this.extractImageUrls(fullData.children)
         if (imageUrls.length > 0) {
-          console.log(`[下载文件] 页面 ${pageId} 发现 ${imageUrls.length} 个文件`)
+          notionLog.downloadFiles(pageId, imageUrls.length, this.config.logLevel)
           await this.fileDownloader.saveFiles(pageId, imageUrls)
         }
       }
@@ -127,7 +114,7 @@ export class NotionPageCoordinator {
       if (this.config.recursive) {
         const childPages = fullData.children.filter(block => isChildPage(block))
         if (childPages.length > 0) {
-          console.log(`[子页面处理] ${pageId} 有 ${childPages.length} 个子页面需要处理`)
+          notionLog.childPages(pageId, childPages.length, this.config.logLevel)
 
           if (!this.config.concurrency || this.config.concurrency <= 0) {
             // 串行处理
@@ -136,14 +123,10 @@ export class NotionPageCoordinator {
               await this.processPage(childPage.id, [...parentPageIds, pageId])
             }
             const timeUsed = timer.end(startTime)
-            console.log(
-              `[串行子页面] 页面 ${pageId} 的 ${childPages.length} 个子页面处理完成，耗时: ${timeUsed} ms`
-            )
+            notionLog.serialComplete(pageId, childPages.length, timeUsed, this.config.logLevel)
           } else {
             // 并发处理
-            console.log(
-              `[并发处理] 使用并发数 ${this.config.concurrency} 处理 ${childPages.length} 个子页面`
-            )
+            notionLog.concurrentProcess(this.config.concurrency, childPages.length, this.config.logLevel)
             const startTime = timer.start()
             
             // 分批处理子页面
@@ -156,17 +139,12 @@ export class NotionPageCoordinator {
             }
 
             const timeUsed = timer.end(startTime)
-            console.log(
-              `[并发子页面] 页面 ${pageId} 的 ${childPages.length} 个子页面处理完成，耗时: ${timeUsed} ms`
-            )
+            notionLog.concurrentComplete(pageId, childPages.length, timeUsed, this.config.logLevel)
           }
         }
       }
     } catch (error) {
-      console.error(
-        `[错误] 处理页面 ${pageId} 失败:`,
-        error instanceof Error ? error.message : String(error)
-      )
+      notionLog.error(pageId, error, this.config.logLevel)
       throw error
     }
   }
