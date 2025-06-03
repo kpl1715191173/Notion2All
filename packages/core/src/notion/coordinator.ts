@@ -2,9 +2,8 @@ import { NotionDataFetcher } from './fetcher'
 import { NotionCacheService } from './cache'
 import { NotionPageSaver } from './saver'
 import { NotionFileDownloader } from './file-downloader'
-import { PageObject } from './types'
 import { isChildPage } from './page'
-import { notionLog, LogLevel, timer } from '@notion2all/utils'
+import { logger, LogLevel } from '@notion2all/utils'
 
 /**
  * Notion 页面协调器
@@ -36,6 +35,9 @@ export class NotionPageCoordinator {
     this.config.includeImages = this.config.includeImages ?? false
     this.config.concurrency = this.config.concurrency ?? 5
     this.config.logLevel = this.config.logLevel ?? LogLevel.level0
+    
+    // 设置日志级别
+    logger.setLogLevel(this.config.logLevel)
   }
 
   /**
@@ -73,7 +75,7 @@ export class NotionPageCoordinator {
    */
   async processPage(pageId: string, parentPageIds: string[] = []): Promise<void> {
     try {
-      notionLog.processStart(pageId, parentPageIds, this.config.logLevel)
+      logger.notion.processStart(pageId, parentPageIds)
 
       // 1. 获取页面数据
       const pageData = await this.fetcher.fetchPageData(pageId)
@@ -86,16 +88,16 @@ export class NotionPageCoordinator {
       )
 
       if (!needsUpdate) {
-        notionLog.useCache(pageId, this.config.logLevel)
+        logger.notion.useCache(pageId)
         return
       }
 
       // 3. 获取完整数据
-      notionLog.fetchData(pageId, this.config.logLevel)
+      logger.notion.fetchData(pageId)
       const fullData = await this.fetcher.fetchFullPageData(pageId)
 
       // 4. 保存数据
-      notionLog.saveData(pageId, this.config.logLevel)
+      logger.notion.saveData(pageId)
       const saveResult = await this.saver.savePageData(pageId, fullData, parentPageIds)
       if (!saveResult.success) {
         throw new Error(`保存页面 ${pageId} 失败: ${saveResult.error}`)
@@ -105,8 +107,10 @@ export class NotionPageCoordinator {
       if (this.config.includeImages) {
         const imageUrls = this.extractImageUrls(fullData.children)
         if (imageUrls.length > 0) {
-          notionLog.downloadFiles(pageId, imageUrls.length, this.config.logLevel)
-          await this.fileDownloader.saveFiles(pageId, imageUrls)
+          logger.notion.downloadFiles(pageId, imageUrls.length)
+          await this.fileDownloader.saveFiles(pageId, imageUrls, {
+            logLevel: this.config.logLevel
+          })
         }
       }
 
@@ -114,20 +118,20 @@ export class NotionPageCoordinator {
       if (this.config.recursive) {
         const childPages = fullData.children.filter(block => isChildPage(block))
         if (childPages.length > 0) {
-          notionLog.childPages(pageId, childPages.length, this.config.logLevel)
+          logger.notion.childPages(pageId, childPages.length)
 
           if (!this.config.concurrency || this.config.concurrency <= 0) {
             // 串行处理
-            const startTime = timer.start()
+            const startTime = process.hrtime.bigint()
             for (const childPage of childPages) {
               await this.processPage(childPage.id, [...parentPageIds, pageId])
             }
-            const timeUsed = timer.end(startTime)
-            notionLog.serialComplete(pageId, childPages.length, timeUsed, this.config.logLevel)
+            const timeUsed = (Number(process.hrtime.bigint() - startTime) / 1_000_000).toFixed(2)
+            logger.notion.serialComplete(pageId, childPages.length, timeUsed)
           } else {
             // 并发处理
-            notionLog.concurrentProcess(this.config.concurrency, childPages.length, this.config.logLevel)
-            const startTime = timer.start()
+            logger.notion.concurrentProcess(this.config.concurrency, childPages.length)
+            const startTime = process.hrtime.bigint()
             
             // 分批处理子页面
             for (let i = 0; i < childPages.length; i += this.config.concurrency) {
@@ -138,13 +142,13 @@ export class NotionPageCoordinator {
               await Promise.all(promises)
             }
 
-            const timeUsed = timer.end(startTime)
-            notionLog.concurrentComplete(pageId, childPages.length, timeUsed, this.config.logLevel)
+            const timeUsed = (Number(process.hrtime.bigint() - startTime) / 1_000_000).toFixed(2)
+            logger.notion.concurrentComplete(pageId, childPages.length, timeUsed)
           }
         }
       }
     } catch (error) {
-      notionLog.error(pageId, error, this.config.logLevel)
+      logger.notion.error(pageId, error)
       throw error
     }
   }

@@ -1,4 +1,5 @@
-import { readFile } from 'fs/promises'
+import { logger, LogLevel } from '@notion2all/utils'
+import { promises as fs } from 'fs'
 import path from 'path'
 import { PageObject } from './types'
 import { formatId } from './utils'
@@ -8,7 +9,11 @@ import { formatId } from './utils'
  * 负责管理页面数据的本地缓存
  */
 export class NotionCacheService {
-  constructor(private outputDir: string) {}
+  private cacheDir: string
+
+  constructor(outputDir: string) {
+    this.cacheDir = path.join(outputDir, '.cache')
+  }
 
   /**
    * 检查页面是否需要更新
@@ -22,10 +27,32 @@ export class NotionCacheService {
     lastEditedTime: string,
     parentPageIds: string[] = []
   ): Promise<boolean> {
-    const cachedData = await this.getCachedData(pageId, parentPageIds)
-    if (!cachedData) return true
+    try {
+      const cachePath = this.getCachePath(pageId, parentPageIds)
+      const cacheExists = await this.checkCacheExists(cachePath)
 
-    return new Date(cachedData.last_edited_time) < new Date(lastEditedTime)
+      if (!cacheExists) {
+        logger.log(`[缓存] 页面 ${pageId} 没有缓存记录`, LogLevel.level2)
+        return true
+      }
+
+      const cacheData = await this.readCache(cachePath)
+      const needsUpdate = cacheData.last_edited_time !== lastEditedTime
+
+      if (needsUpdate) {
+        logger.log(`[缓存] 页面 ${pageId} 需要更新，最后编辑时间已变更`, LogLevel.level2)
+      } else {
+        logger.log(`[缓存] 页面 ${pageId} 使用缓存，内容未变更`, LogLevel.level2)
+      }
+
+      return needsUpdate
+    } catch (error) {
+      logger.error(
+        `[缓存] 检查页面 ${pageId} 缓存状态失败: ${error instanceof Error ? error.message : String(error)}`,
+        LogLevel.level2
+      )
+      return true
+    }
   }
 
   /**
@@ -39,17 +66,46 @@ export class NotionCacheService {
       const formattedIds = parentPageIds.map(id => formatId(id))
       const formattedPageId = formatId(pageId)
       const filePath = path.join(
-        this.outputDir,
+        this.cacheDir,
         ...formattedIds,
         formattedPageId,
         `${formattedPageId}.json`
       )
 
-      const fileContent = await readFile(filePath, 'utf-8')
+      const fileContent = await fs.readFile(filePath, 'utf-8')
       return JSON.parse(fileContent)
     } catch (error) {
       console.log(`[缓存读取] 页面 ${pageId} 本地文件不存在或读取失败`)
       return null
+    }
+  }
+
+  private getCachePath(pageId: string, parentIds: string[] = []): string {
+    const relativePath = parentIds.length > 0
+      ? path.join(...parentIds, pageId)
+      : pageId
+    return path.join(this.cacheDir, `${relativePath}.json`)
+  }
+
+  private async checkCacheExists(cachePath: string): Promise<boolean> {
+    try {
+      await fs.access(cachePath)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  private async readCache(cachePath: string): Promise<any> {
+    try {
+      const content = await fs.readFile(cachePath, 'utf-8')
+      return JSON.parse(content)
+    } catch (error) {
+      logger.error(
+        `[缓存] 读取缓存文件失败: ${error instanceof Error ? error.message : String(error)}`,
+        LogLevel.level2
+      )
+      throw error
     }
   }
 }

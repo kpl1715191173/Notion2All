@@ -1,128 +1,104 @@
 import { NotionApi } from './api'
 import { NotionBlock, PageObject } from './types'
+import { logger, LogLevel } from '@notion2all/utils'
 
 /**
- * Notion 数据获取服务
- * 负责从 Notion API 获取页面和块数据
+ * Notion 数据获取器
+ * 负责从 Notion API 获取数据
  */
 export class NotionDataFetcher {
-  constructor(private api: NotionApi) {}
+  constructor(private notionApi: NotionApi) {}
 
   /**
-   * 获取页面基本信息
+   * 获取页面的基本信息
    * @param pageId 页面ID
-   * @returns 页面数据
    */
   async fetchPageData(pageId: string): Promise<PageObject> {
     try {
-      console.log(`[网络请求] 获取页面 ${pageId} 的基本信息`)
-      const pageData = await this.api.getPage(pageId)
+      logger.log(`[网络请求] 获取页面 ${pageId} 的基本信息`, LogLevel.level1)
+      const pageData = await this.notionApi.getPage(pageId)
       return {
         ...pageData,
         children: [],
       }
     } catch (error) {
-      console.error(
-        `[错误] 获取页面 ${pageId} 失败:`,
-        error instanceof Error ? error.message : String(error)
+      logger.error(
+        `[错误] 获取页面 ${pageId} 失败: ${error instanceof Error ? error.message : String(error)}`,
+        LogLevel.level1
       )
-      throw new Error(
-        `获取页面 ${pageId} 失败: ${error instanceof Error ? error.message : String(error)}`
-      )
+      throw error
     }
   }
 
   /**
    * 获取块的子块列表
    * @param blockId 块ID
-   * @returns 子块列表
    */
   async fetchBlockChildren(blockId: string): Promise<NotionBlock[]> {
     try {
-      console.log(`[网络请求] 获取块 ${blockId} 的子块列表`)
-      const children = await this.api.getBlockChildren(blockId)
+      logger.log(`[网络请求] 获取块 ${blockId} 的子块列表`, LogLevel.level1)
+      const children = await this.notionApi.getBlockChildren(blockId)
 
       if (!children || !Array.isArray(children)) {
-        console.warn(`[警告] 块 ${blockId} 的子块数据格式不正确`)
+        logger.warning(`[警告] 块 ${blockId} 的子块数据格式不正确`, LogLevel.level1)
         return []
       }
 
-      console.log(`[网络请求] 块 ${blockId} 获取到 ${children.length} 个子块`)
+      logger.log(`[网络请求] 块 ${blockId} 获取到 ${children.length} 个子块`, LogLevel.level1)
       return children.map(block => ({
         ...block,
         children: (block as any).has_children ? [] : undefined,
       })) as NotionBlock[]
     } catch (error) {
-      console.error(
-        `[错误] 获取块 ${blockId} 的子块失败:`,
-        error instanceof Error ? error.message : String(error)
+      logger.error(
+        `[错误] 获取块 ${blockId} 的子块失败: ${error instanceof Error ? error.message : String(error)}`,
+        LogLevel.level1
       )
-      throw new Error(
-        `获取块 ${blockId} 的子块失败: ${error instanceof Error ? error.message : String(error)}`
-      )
+      throw error
     }
   }
 
   /**
-   * 获取页面的完整数据，包括所有子块
+   * 获取页面的完整数据（包括所有子块）
    * @param pageId 页面ID
-   * @returns 完整的页面数据
    */
   async fetchFullPageData(pageId: string): Promise<PageObject> {
     try {
       const pageData = await this.fetchPageData(pageId)
-      const blocks = await this.fetchBlockChildren(pageId)
+      const children = await this.fetchBlockChildren(pageId)
 
-      // 递归获取所有子块的数据
-      const processedBlocks = await this.processBlocks(blocks, pageId)
+      // 递归获取所有子块
+      const processChildren = async (blocks: NotionBlock[]): Promise<NotionBlock[]> => {
+        const results: NotionBlock[] = []
 
-      return {
-        ...pageData,
-        children: processedBlocks,
-      }
-    } catch (error) {
-      console.error(
-        `[错误] 获取页面 ${pageId} 的完整数据失败:`,
-        error instanceof Error ? error.message : String(error)
-      )
-      throw new Error(
-        `获取页面 ${pageId} 的完整数据失败: ${error instanceof Error ? error.message : String(error)}`
-      )
-    }
-  }
-
-  /**
-   * 递归处理块及其子块
-   * @param blocks 块列表
-   * @param parentPageId 父页面ID
-   * @returns 处理后的块列表
-   */
-  private async processBlocks(blocks: NotionBlock[], parentPageId: string): Promise<NotionBlock[]> {
-    const processedBlocks: NotionBlock[] = []
-
-    for (const block of blocks) {
-      const blockWithChildren: NotionBlock = {
-        ...block,
-        children: [],
-      }
-
-      if ((block as any).has_children) {
-        try {
-          const childBlocks = await this.fetchBlockChildren(block.id)
-          if (childBlocks.length > 0) {
-            blockWithChildren.children = await this.processBlocks(childBlocks, parentPageId)
+        for (const block of blocks) {
+          try {
+            if ((block as any).has_children) {
+              const childBlocks = await this.fetchBlockChildren(block.id)
+              block.children = await processChildren(childBlocks)
+            }
+            results.push(block)
+          } catch (error) {
+            logger.error(
+              `[错误] 处理块 ${block.id} 的子块失败: ${error instanceof Error ? error.message : String(error)}`,
+              LogLevel.level1
+            )
+            // 继续处理其他块
+            results.push(block)
           }
-        } catch (error) {
-          console.error(
-            `[错误] 处理块 ${block.id} 的子块失败:`,
-            error instanceof Error ? error.message : String(error)
-          )
         }
+
+        return results
       }
 
-      processedBlocks.push(blockWithChildren)
+      pageData.children = await processChildren(children)
+      return pageData
+    } catch (error) {
+      logger.error(
+        `[错误] 获取页面 ${pageId} 的完整数据失败: ${error instanceof Error ? error.message : String(error)}`,
+        LogLevel.level1
+      )
+      throw error
     }
-
-    return processedBlocks
   }
 }

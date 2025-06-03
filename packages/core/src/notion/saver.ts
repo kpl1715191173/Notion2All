@@ -1,4 +1,5 @@
-import { writeFile, mkdir } from 'fs/promises'
+import { logger, LogLevel } from '@notion2all/utils'
+import { promises as fs } from 'fs'
 import path from 'path'
 import { PageObject, SaveResult } from './types'
 import { formatId } from './utils'
@@ -19,23 +20,6 @@ export class NotionPageSaver {
   }
 
   /**
-   * 确保输出目录存在
-   * @param dirPath 目录路径
-   * @throws 如果创建目录失败且错误不是目录已存在
-   */
-  private async ensureOutputDir(dirPath: string): Promise<void> {
-    try {
-      await mkdir(dirPath, { recursive: true })
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
-        throw new Error(
-          `创建输出目录失败: ${error instanceof Error ? error.message : String(error)}`
-        )
-      }
-    }
-  }
-
-  /**
    * 保存页面数据到文件
    * @param pageId 页面ID
    * @param data 页面数据
@@ -53,18 +37,38 @@ export class NotionPageSaver {
       const pageDir = path.join(this.outputDir, ...formattedIds, formattedPageId)
       const filePath = path.join(pageDir, `${formattedPageId}.json`)
 
-      await this.ensureOutputDir(pageDir)
-      await writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8')
+      await this.ensureDirectoryExists(path.dirname(filePath))
+      
+      logger.log(`[保存] 保存页面 ${pageId} 到 ${filePath}`, LogLevel.level2)
+      await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8')
 
       return {
         success: true,
         filePath,
       }
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      logger.error(`[保存] 保存页面 ${pageId} 失败: ${errorMessage}`, LogLevel.level2)
       return {
         success: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorMessage,
       }
+    }
+  }
+
+  private getSavePath(pageId: string, parentIds: string[] = []): string {
+    const relativePath = parentIds.length > 0
+      ? path.join(...parentIds, pageId)
+      : pageId
+    return path.join(this.outputDir, `${relativePath}.json`)
+  }
+
+  private async ensureDirectoryExists(dirPath: string): Promise<void> {
+    try {
+      await fs.access(dirPath)
+    } catch {
+      logger.log(`[保存] 创建目录 ${dirPath}`, LogLevel.level2)
+      await fs.mkdir(dirPath, { recursive: true })
     }
   }
 }
