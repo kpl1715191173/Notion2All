@@ -38,17 +38,17 @@ export const BackupConfigSchema = z.object({
    * 在outputDir下元数据无篡改情况下，根据修改时间判断是否重新下载
    */
   enableCache: z.boolean().default(true),
-
-  /**
-   * 是否显示递归下载的日志信息 - 默认 false
-   */
-  logRecursive: z.boolean().default(false),
-
   /**
    * 并发处理页面的数量 - 默认 5
    * 0 表示不使用并发处理
    */
   concurrency: z.number().int().min(0).default(5),
+  /**
+   * 是否显示详细版的日志信息 - 默认 false
+   */
+  logDetails: z.boolean().default(false),
+
+  
 })
 
 // 认证配置
