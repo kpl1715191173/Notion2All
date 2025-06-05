@@ -2,8 +2,9 @@ import { NotionDataFetcher } from './fetcher'
 import { NotionCacheService } from './cache'
 import { NotionPageSaver } from './saver'
 import { NotionFileDownloader } from './file-downloader'
-import { isChildPage } from './page'
+import { isChildPage } from '../page'
 import { logger, LogLevel } from '@notion2all/utils'
+import { NotionBlock } from '../types'
 
 /**
  * Notion 页面协调器
@@ -152,4 +153,4 @@ export class NotionPageCoordinator {
       throw error
     }
   }
-}
+} 

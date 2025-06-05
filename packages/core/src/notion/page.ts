@@ -1,6 +1,6 @@
 import { NotionApi } from './api'
 import { BlockObjectResponse } from '@notionhq/client/build/src/api-endpoints'
-import { NotionPageSaver } from './saver'
+import { NotionPageSaver } from './services/saver'
 import type { NotionBlock as NotionBlockType } from './types'
 
 // 使用本地类型定义

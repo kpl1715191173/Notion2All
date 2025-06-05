@@ -78,8 +78,10 @@ export const backupCommand = (program: Command) => {
 
         log(`📁 配置文件路径: ${configLoader.getConfigPath()}`, LogLevel.level1)
 
+        const logDetails = config.logDetails
+
         const logConfig: string[] = []
-        if (config.logDetails) logConfig.push(' ❇️ 显示完整版的日志')
+        if (logDetails) logConfig.push(' ❇️ 显示完整版的日志')
         const configMsg = await createBox({
           title: '配置信息',
           content: [
@@ -100,7 +102,7 @@ export const backupCommand = (program: Command) => {
 
         log(configMsg + '\n', LogLevel.level1)
 
-        if (config.logDetails) {
+        if (logDetails) {
           log(JSON.stringify(config, null, 2), LogLevel.level1)
           successLog('配置加载完成\n', LogLevel.level1)
         }
@@ -118,7 +120,7 @@ export const backupCommand = (program: Command) => {
         }
 
         if (config.pages.length > 0) {
-          log('📄 开始备份页面:', LogLevel.level1)
+          log('📥 开始备份页面:', LogLevel.level1)
 
           // 创建共享服务实例
           const fetcher = new NotionDataFetcher(notionApi)

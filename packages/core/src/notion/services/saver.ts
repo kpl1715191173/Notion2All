@@ -1,8 +1,8 @@
 import { logger, LogLevel } from '@notion2all/utils'
 import { promises as fs } from 'fs'
 import path from 'path'
-import { PageObject, SaveResult } from './types'
-import { formatId } from './utils'
+import { PageObject, SaveResult } from '../types'
+import { formatId } from '../utils'
 
 /**
  * Notion 页面数据保存器
@@ -71,4 +71,4 @@ export class NotionPageSaver {
       await fs.mkdir(dirPath, { recursive: true })
     }
   }
-}
+} 

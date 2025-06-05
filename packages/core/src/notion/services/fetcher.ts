@@ -1,5 +1,5 @@
-import { NotionApi } from './api'
-import { NotionBlock, PageObject } from './types'
+import { NotionApi } from '../api'
+import { NotionBlock, PageObject } from '../types'
 import { logger, LogLevel } from '@notion2all/utils'
 
 /**
@@ -101,4 +101,4 @@ export class NotionDataFetcher {
       throw error
     }
   }
-}
+} 
