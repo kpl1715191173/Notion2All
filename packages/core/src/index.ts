@@ -29,7 +29,7 @@ export { NotionPageCoordinator } from './notion/services/coordinator'
 export { NotionFileDownloader } from './notion/services/file-downloader'
 
 // 导出工具函数 - 页面处理相关
-export { formatPageId, isChildPage, hasChildren } from './notion/page'
+// export { formatPageId, isChildPage, hasChildren } from './notion/page'
 
 // 导出 API 接口
 export * from './notion/api'

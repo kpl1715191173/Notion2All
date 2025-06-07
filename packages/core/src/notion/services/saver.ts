@@ -21,16 +21,19 @@ export class NotionPageSaver {
 
   /**
    * 保存页面数据到文件
-   * @param pageId 页面ID
-   * @param data 页面数据
-   * @param parentPageIds 父页面ID链
+   * @param config.pageId 页面ID
+   * @param config.data 页面数据
+   * @param config.parentPageIds 父页面ID链
    * @returns 保存结果
    */
   async savePageData(
-    pageId: string,
-    data: PageObject,
-    parentPageIds: string[] = []
+    config: {
+      pageId: string;
+      data: PageObject;
+      parentPageIds?: string[];
+    }
   ): Promise<SaveResult> {
+    const { pageId, data, parentPageIds = [] } = config;
     try {
       const formattedIds = parentPageIds.map(id => formatId(id))
       const formattedPageId = formatId(pageId)
@@ -56,7 +59,8 @@ export class NotionPageSaver {
     }
   }
 
-  private getSavePath(pageId: string, parentIds: string[] = []): string {
+  private getSavePath(config: { pageId: string; parentIds?: string[] }): string {
+    const { pageId, parentIds = [] } = config;
     const relativePath = parentIds.length > 0
       ? path.join(...parentIds, pageId)
       : pageId

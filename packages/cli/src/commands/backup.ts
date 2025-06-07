@@ -132,28 +132,30 @@ export const backupCommand = (program: Command) => {
 
           if (concurrency <= 0) {
             // 串行处理根页面
-            log(`[串行处理] 开始处理 ${config.pages.length} 个根页面`, LogLevel.level1)
+            log(`🔜 串行处理: 开始处理 ${config.pages.length} 个根页面`, LogLevel.level1)
             const startTime = timer.start()
 
             for (const page of config.pages) {
               try {
                 const pageId = typeof page === 'string' ? page : page.id
-                log(`处理页面 ${pageId}...`, LogLevel.level2)
+                log(`📄 处理页面 ${pageId}...`, LogLevel.level2)
 
                 // 创建协调器实例
-                const coordinator = new NotionPageCoordinator(
+                const coordinator = new NotionPageCoordinator({
                   fetcher,
                   cacheService,
                   saver,
-                  {
+                  config: {
                     recursive: config.recursive,
-                    includeImages: config.includeAttachments === 'onlyPic' || config.includeAttachments === 'all',
-                    concurrency: config.concurrency
-                  }
-                )
+                    includeImages:
+                      config.includeAttachments === 'onlyPic' ||
+                      config.includeAttachments === 'all',
+                    concurrency: config.concurrency,
+                  },
+                })
 
                 try {
-                  await coordinator.processPage(pageId)
+                  await coordinator.processPage({ pageId })
                   successLog(`页面 ${pageId} 备份完成`, LogLevel.level2)
                 } catch (error) {
                   errorLog(
@@ -178,7 +180,7 @@ export const backupCommand = (program: Command) => {
           } else {
             // 并发处理根页面，但限制并发数
             log(
-              `[并发处理] 使用并发数 ${concurrency} 处理 ${config.pages.length} 个根页面`,
+              `🔜 并发处理: 处理 ${config.pages.length} 个根页面【并发数 ${concurrency}】`,
               LogLevel.level1
             )
             const startTime = timer.start()
@@ -190,23 +192,25 @@ export const backupCommand = (program: Command) => {
               const pagePromises = batch.map(async page => {
                 try {
                   const pageId = typeof page === 'string' ? page : page.id
-                  log(`处理页面 ${pageId}...`, LogLevel.level2)
+                  log(`📄 处理页面 ${pageId}...`, LogLevel.level2)
 
                   // 创建协调器实例
-                  const coordinator = new NotionPageCoordinator(
+                  const coordinator = new NotionPageCoordinator({
                     fetcher,
                     cacheService,
                     saver,
-                    {
+                    config: {
                       recursive: config.recursive,
-                      includeImages: config.includeAttachments === 'onlyPic' || config.includeAttachments === 'all',
+                      includeImages:
+                        config.includeAttachments === 'onlyPic' ||
+                        config.includeAttachments === 'all',
                       concurrency: config.concurrency,
-                      logLevel: LogLevel.level2
-                    }
-                  )
+                      logLevel: LogLevel.level2,
+                    },
+                  })
 
                   try {
-                    await coordinator.processPage(pageId)
+                    await coordinator.processPage({ pageId })
                     successLog(`页面 ${pageId} 备份完成`, LogLevel.level2)
                   } catch (error) {
                     errorLog(

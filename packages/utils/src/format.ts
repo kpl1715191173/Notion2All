@@ -1,3 +1,5 @@
+import { NotionBlock } from '@notion2all/core'
+
 /**
  * 格式化页面 ID，确保使用带连字符的格式
  * @param id 页面ID或块ID
@@ -20,7 +22,7 @@ export const timer = {
   start: (): bigint => {
     return process.hrtime.bigint()
   },
-  
+
   /**
    * 结束计时并计算经过的时间
    * @param startTime 开始时间戳
@@ -38,7 +40,7 @@ export const timer = {
  * @param block 块对象
  * @returns 是否是子页面
  */
-export function isChildPage(block: any): boolean {
+export function isChildPage(block: NotionBlock): boolean {
   return block?.type === 'child_page'
 }
 
@@ -47,6 +49,6 @@ export function isChildPage(block: any): boolean {
  * @param block 块对象
  * @returns 是否有子块
  */
-export function hasChildren(block: any): boolean {
+export function hasChildren(block: NotionBlock): boolean {
   return block?.has_children === true
-} 
+}

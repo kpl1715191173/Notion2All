@@ -31,23 +31,27 @@ export class NotionApi {
     this.client = new Client(clientOptions)
   }
 
-  async getPage(pageId: string): Promise<PageObjectResponse> {
+  async getPage(options: { pageId: string }): Promise<PageObjectResponse> {
+    const { pageId } = options;
     return this.client.pages.retrieve({ page_id: pageId }) as Promise<PageObjectResponse>
   }
 
-  async getDatabase(databaseId: string): Promise<DatabaseObjectResponse> {
+  async getDatabase(options: { databaseId: string }): Promise<DatabaseObjectResponse> {
+    const { databaseId } = options;
     return this.client.databases.retrieve({
       database_id: databaseId,
     }) as Promise<DatabaseObjectResponse>
   }
 
-  async queryDatabase(databaseId: string) {
+  async queryDatabase(options: { databaseId: string }) {
+    const { databaseId } = options;
     return this.client.databases.query({
       database_id: databaseId,
     })
   }
 
-  async getBlockChildren(blockId: string) {
+  async getBlockChildren(options: { blockId: string }) {
+    const { blockId } = options;
     const response = await this.client.blocks.children.list({
       block_id: blockId,
     })

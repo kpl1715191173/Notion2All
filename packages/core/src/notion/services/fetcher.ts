@@ -11,12 +11,13 @@ export class NotionDataFetcher {
 
   /**
    * 获取页面的基本信息
-   * @param pageId 页面ID
+   * @param config.pageId 页面ID
    */
-  async fetchPageData(pageId: string): Promise<PageObject> {
+  async fetchPageData(config: { pageId: string }): Promise<PageObject> {
+    const { pageId } = config
     try {
       logger.log(`[网络请求] 获取页面 ${pageId} 的基本信息`, LogLevel.level1)
-      const pageData = await this.notionApi.getPage(pageId)
+      const pageData = await this.notionApi.getPage({ pageId })
       return {
         ...pageData,
         children: [],
@@ -32,12 +33,13 @@ export class NotionDataFetcher {
 
   /**
    * 获取块的子块列表
-   * @param blockId 块ID
+   * @param config.blockId 块ID
    */
-  async fetchBlockChildren(blockId: string): Promise<NotionBlock[]> {
+  async fetchBlockChildren(config: { blockId: string }): Promise<NotionBlock[]> {
+    const { blockId } = config
     try {
       logger.log(`[网络请求] 获取块 ${blockId} 的子块列表`, LogLevel.level1)
-      const children = await this.notionApi.getBlockChildren(blockId)
+      const children = await this.notionApi.getBlockChildren({ blockId })
 
       if (!children || !Array.isArray(children)) {
         logger.warning(`[警告] 块 ${blockId} 的子块数据格式不正确`, LogLevel.level1)
@@ -60,12 +62,13 @@ export class NotionDataFetcher {
 
   /**
    * 获取页面的完整数据（包括所有子块）
-   * @param pageId 页面ID
+   * @param config.pageId 页面ID
    */
-  async fetchFullPageData(pageId: string): Promise<PageObject> {
+  async fetchFullPageData(config: { pageId: string }): Promise<PageObject> {
+    const { pageId } = config
     try {
-      const pageData = await this.fetchPageData(pageId)
-      const children = await this.fetchBlockChildren(pageId)
+      const pageData = await this.fetchPageData({ pageId })
+      const children = await this.fetchBlockChildren({ blockId: pageId })
 
       // 递归获取所有子块
       const processChildren = async (blocks: NotionBlock[]): Promise<NotionBlock[]> => {
@@ -74,7 +77,7 @@ export class NotionDataFetcher {
         for (const block of blocks) {
           try {
             if ((block as any).has_children) {
-              const childBlocks = await this.fetchBlockChildren(block.id)
+              const childBlocks = await this.fetchBlockChildren({ blockId: block.id })
               block.children = await processChildren(childBlocks)
             }
             results.push(block)
@@ -101,4 +104,4 @@ export class NotionDataFetcher {
       throw error
     }
   }
-} 
+}

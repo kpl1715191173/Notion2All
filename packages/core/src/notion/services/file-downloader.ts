@@ -183,18 +183,21 @@ export class NotionFileDownloader {
 
   /**
    * 保存文件
-   * @param pageId 页面ID
-   * @param blockId 文件块ID
-   * @param fileUrl 文件URL
-   * @param options 下载选项
+   * @param config.pageId 页面ID
+   * @param config.blockId 文件块ID
+   * @param config.fileUrl 文件URL
+   * @param config.options 下载选项
    * @returns 保存结果
    */
   async saveFile(
-    pageId: string,
-    blockId: string,
-    fileUrl: string,
-    options: DownloadOptions = {}
+    config: {
+      pageId: string;
+      blockId: string;
+      fileUrl: string;
+      options?: DownloadOptions;
+    }
   ): Promise<SaveResult> {
+    const { pageId, blockId, fileUrl, options = {} } = config;
     const logLevel = options.logLevel ?? LogLevel.level2
 
     try {
@@ -243,23 +246,31 @@ export class NotionFileDownloader {
 
   /**
    * 批量保存文件
-   * @param pageId 页面ID
-   * @param files 文件信息数组
-   * @param options 下载选项
+   * @param config.pageId 页面ID
+   * @param config.files 文件信息数组
+   * @param config.options 下载选项
    * @returns 保存结果数组
    */
   async saveFiles(
-    pageId: string, 
-    files: Array<{ blockId: string; url: string }>,
-    options: DownloadOptions = {}
+    config: {
+      pageId: string;
+      files: Array<{ blockId: string; url: string }>;
+      options?: DownloadOptions;
+    }
   ): Promise<SaveResult[]> {
+    const { pageId, files, options = {} } = config;
     const results: SaveResult[] = []
     const logLevel = options.logLevel ?? LogLevel.level2
     
     logger.log(`[下载] 开始下载 ${files.length} 个文件`, logLevel)
     
     for (const file of files) {
-      const result = await this.saveFile(pageId, file.blockId, file.url, options)
+      const result = await this.saveFile({
+        pageId,
+        blockId: file.blockId,
+        fileUrl: file.url,
+        options
+      })
       results.push(result)
     }
     

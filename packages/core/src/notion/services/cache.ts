@@ -17,18 +17,21 @@ export class NotionCacheService {
 
   /**
    * 检查页面是否需要更新
-   * @param pageId 页面ID
-   * @param lastEditedTime 最后编辑时间
-   * @param parentPageIds 父页面ID链
+   * @param config.pageId 页面ID
+   * @param config.lastEditedTime 最后编辑时间
+   * @param config.parentPageIds 父页面ID链
    * @returns 是否需要更新
    */
   async shouldUpdate(
-    pageId: string,
-    lastEditedTime: string,
-    parentPageIds: string[] = []
+    config: {
+      pageId: string;
+      lastEditedTime: string;
+      parentPageIds?: string[];
+    }
   ): Promise<boolean> {
+    const { pageId, lastEditedTime, parentPageIds = [] } = config;
     try {
-      const cachePath = this.getCachePath(pageId, parentPageIds)
+      const cachePath = this.getCachePath({ pageId, parentIds: parentPageIds })
       const cacheExists = await this.checkCacheExists(cachePath)
 
       if (!cacheExists) {
@@ -57,11 +60,12 @@ export class NotionCacheService {
 
   /**
    * 获取缓存的页面数据
-   * @param pageId 页面ID
-   * @param parentPageIds 父页面ID链
+   * @param config.pageId 页面ID
+   * @param config.parentPageIds 父页面ID链
    * @returns 缓存的页面数据，如果不存在则返回 null
    */
-  async getCachedData(pageId: string, parentPageIds: string[] = []): Promise<PageObject | null> {
+  async getCachedData(config: { pageId: string; parentPageIds?: string[] }): Promise<PageObject | null> {
+    const { pageId, parentPageIds = [] } = config;
     try {
       const formattedIds = parentPageIds.map(id => formatId(id))
       const formattedPageId = formatId(pageId)
@@ -80,7 +84,8 @@ export class NotionCacheService {
     }
   }
 
-  private getCachePath(pageId: string, parentIds: string[] = []): string {
+  private getCachePath(config: { pageId: string; parentIds?: string[] }): string {
+    const { pageId, parentIds = [] } = config;
     const relativePath = parentIds.length > 0
       ? path.join(...parentIds, pageId)
       : pageId
