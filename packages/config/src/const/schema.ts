@@ -1,3 +1,4 @@
+import { LogLevel } from '@notionhq/client'
 import { z } from 'zod'
 
 // 页面配置 schema
@@ -47,8 +48,10 @@ export const BackupConfigSchema = z.object({
    * 是否显示详细版的日志信息 - 默认 false
    */
   logDetails: z.boolean().default(false),
-
-  
+  /**
+   * 显示日志的层级 - 默认 2
+   */
+  logLevel: z.number().int().min(0).max(5).default(2)
 })
 
 // 认证配置

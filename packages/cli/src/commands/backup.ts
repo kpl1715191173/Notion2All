@@ -7,9 +7,8 @@ import {
   NotionPageCoordinator,
   NotionPageSaver,
 } from '@notion2all/core'
-import { errorLog, log, successLog, warningLog } from '@notion2all/utils'
-import { createBox } from '../utils/boxen'
-import { LogLevel } from '@notion2all/utils/src'
+import { Logger, LogLevel } from '@notion2all/utils'
+import { createBox } from '../utils'
 
 // 计时器工具函数
 const timer = {
@@ -35,8 +34,18 @@ export const backupCommand = (program: Command) => {
     .option('--no-recursive', 'Do not recursively backup child pages')
     .option('-l, --log-recursive', '是否记录递归过程')
     .option('-c, --concurrency <number>', '并发处理页面的数量 (0表示串行处理)')
+    // .option('--log-level <level>', '日志级别 (0-4)')
     .action(async options => {
       try {
+        /**
+         * ====== 加载配置 ======
+         */
+        const configLoader = ConfigLoader.getInstance()
+        const config = await configLoader.load()
+        // 设置全局日志级别
+        const logLevel = config.logLevel as LogLevel
+        Logger.getInstance().setLogLevel(logLevel)
+
         const summaryMsg = await createBox({
           title: 'Notion2All备份程序',
           content: [
@@ -46,21 +55,16 @@ export const backupCommand = (program: Command) => {
           ],
           padding: { left: 10, right: 10 },
         })
-        log(summaryMsg, LogLevel.level0)
-        log('\n')
+        Logger.log(summaryMsg, LogLevel.level0)
+        Logger.log('\n')
 
-        /**
-         * ====== 加载配置 ======
-         */
-        log('🛑 [Step1] ------------------ 加载配置数据 ------------------', LogLevel.level0)
-        const configLoader = ConfigLoader.getInstance()
-        const config = await configLoader.load()
+        Logger.log('🛑 [Step1] ------------------ 加载配置数据 ------------------', LogLevel.level0)
 
         const apiKeyInfo = await configLoader.getApiKey()
         if (!apiKeyInfo?.key) {
-          errorLog('无法获取API_KEY，请检查后重试', LogLevel.level1)
+          Logger.error('无法获取API_KEY，请检查后重试', LogLevel.level1)
         } else {
-          successLog('API_KEY 检查通过', LogLevel.level1)
+          Logger.success('API_KEY 检查通过', LogLevel.level1)
         }
 
         // 命令行参数覆盖配置
@@ -72,11 +76,11 @@ export const backupCommand = (program: Command) => {
         if (options.pageId && config.pages.length === 0) {
           config.pages = [options.pageId]
         }
-        if (options.concurrency !== undefined) {
+        if (options.concurrency) {
           config.concurrency = parseInt(options.concurrency, 10)
         }
 
-        log(`📁 配置文件路径: ${configLoader.getConfigPath()}`, LogLevel.level1)
+        Logger.log(`📁 配置文件路径: ${configLoader.getConfigPath()}`, LogLevel.level1)
 
         const logDetails = config.logDetails
 
@@ -100,27 +104,30 @@ export const backupCommand = (program: Command) => {
           },
         })
 
-        log(configMsg + '\n', LogLevel.level1)
+        Logger.log(configMsg + '\n', LogLevel.level1)
 
         if (logDetails) {
-          log(JSON.stringify(config, null, 2), LogLevel.level1)
-          successLog('配置加载完成\n', LogLevel.level1)
+          Logger.log(JSON.stringify(config, null, 2), LogLevel.level1)
+          Logger.success('配置加载完成\n', LogLevel.level1)
         }
 
         /**
          * ====== 备份逻辑 ======
          */
-        log('🛑 [Step2] ------------------ 获取Notion数据 ------------------', LogLevel.level0)
+        Logger.log(
+          '🛑 [Step2] ------------------ 获取Notion数据 ------------------',
+          LogLevel.level0
+        )
 
         const notionApi = createNotionApi({
           auth: apiKeyInfo?.key!,
         })
         if (notionApi) {
-          successLog('Notion SDK初始化成功', LogLevel.level1)
+          Logger.success('Notion SDK初始化成功', LogLevel.level1)
         }
 
         if (config.pages.length > 0) {
-          log('📥 开始备份页面:', LogLevel.level1)
+          Logger.log('📥 开始备份页面:', LogLevel.level1)
 
           // 创建共享服务实例
           const fetcher = new NotionDataFetcher(notionApi)
@@ -132,13 +139,13 @@ export const backupCommand = (program: Command) => {
 
           if (concurrency <= 0) {
             // 串行处理根页面
-            log(`🔜 串行处理: 开始处理 ${config.pages.length} 个根页面`, LogLevel.level1)
+            Logger.log(`🔜 串行处理: 开始处理 ${config.pages.length} 个根页面`, LogLevel.level1)
             const startTime = timer.start()
 
             for (const page of config.pages) {
               try {
                 const pageId = typeof page === 'string' ? page : page.id
-                log(`📄 处理页面 ${pageId}...`, LogLevel.level2)
+                Logger.log(`📄 处理页面 ${pageId}...`, LogLevel.level2)
 
                 // 创建协调器实例
                 const coordinator = new NotionPageCoordinator({
@@ -151,21 +158,22 @@ export const backupCommand = (program: Command) => {
                       config.includeAttachments === 'onlyPic' ||
                       config.includeAttachments === 'all',
                     concurrency: config.concurrency,
+                    logLevel: parseInt(options.logLevel, 10) as LogLevel,
                   },
                 })
 
                 try {
                   await coordinator.processPage({ pageId })
-                  successLog(`页面 ${pageId} 备份完成`, LogLevel.level2)
+                  Logger.success(`页面 ${pageId} 备份完成`, LogLevel.level2)
                 } catch (error) {
-                  errorLog(
+                  Logger.error(
                     `页面 ${pageId} 备份失败: ${error instanceof Error ? error.message : String(error)}`,
                     LogLevel.level2
                   )
                   throw error
                 }
               } catch (error) {
-                errorLog(
+                Logger.error(
                   `处理页面 ${typeof page === 'string' ? page : page.id} 失败: ${error instanceof Error ? error.message : String(error)}`,
                   LogLevel.level1
                 )
@@ -173,13 +181,13 @@ export const backupCommand = (program: Command) => {
             }
 
             const timeUsed = timer.end(startTime)
-            successLog(
+            Logger.success(
               `[串行处理] 完成处理 ${config.pages.length} 个根页面，耗时: ${timeUsed} ms`,
               LogLevel.level1
             )
           } else {
             // 并发处理根页面，但限制并发数
-            log(
+            Logger.log(
               `🔜 并发处理: 处理 ${config.pages.length} 个根页面【并发数 ${concurrency}】`,
               LogLevel.level1
             )
@@ -192,7 +200,7 @@ export const backupCommand = (program: Command) => {
               const pagePromises = batch.map(async page => {
                 try {
                   const pageId = typeof page === 'string' ? page : page.id
-                  log(`📄 处理页面 ${pageId}...`, LogLevel.level2)
+                  Logger.log(`📄 处理页面 ${pageId}...`, LogLevel.level1)
 
                   // 创建协调器实例
                   const coordinator = new NotionPageCoordinator({
@@ -205,45 +213,44 @@ export const backupCommand = (program: Command) => {
                         config.includeAttachments === 'onlyPic' ||
                         config.includeAttachments === 'all',
                       concurrency: config.concurrency,
-                      logLevel: LogLevel.level2,
+                      logLevel: options.logRecursive
+                        ? LogLevel.level2
+                        : (parseInt(options.logLevel, 10) as LogLevel),
                     },
                   })
 
-                  try {
-                    await coordinator.processPage({ pageId })
-                    successLog(`页面 ${pageId} 备份完成`, LogLevel.level2)
-                  } catch (error) {
-                    errorLog(
-                      `页面 ${pageId} 备份失败: ${error instanceof Error ? error.message : String(error)}`,
-                      LogLevel.level2
-                    )
-                  }
+                  await coordinator.processPage({ pageId })
+                  Logger.success(`页面 ${pageId} 备份完成`, LogLevel.level2)
                 } catch (error) {
-                  errorLog(
-                    `处理页面 ${typeof page === 'string' ? page : page.id} 失败: ${error instanceof Error ? error.message : String(error)}`,
+                  Logger.error(
+                    `处理页面 ${typeof page === 'string' ? page : page.id} 失败: ${
+                      error instanceof Error ? error.message : String(error)
+                    }`,
                     LogLevel.level1
                   )
                 }
               })
 
-              // 等待当前批次完成
               await Promise.all(pagePromises)
             }
 
             const timeUsed = timer.end(startTime)
-            successLog(
+            Logger.success(
               `[并发处理] 完成处理 ${config.pages.length} 个根页面，耗时: ${timeUsed} ms`,
               LogLevel.level1
             )
           }
         } else {
-          warningLog('⚠️ 没有配置需要备份的页面', LogLevel.level1)
+          Logger.warning(
+            '没有指定要备份的页面，请在配置文件中添加或使用 --page-id 参数指定',
+            LogLevel.level1
+          )
         }
 
-        successLog('备份完成！', LogLevel.level0)
-      } catch (err: unknown) {
-        const errorMessage = err instanceof Error ? err.message : String(err)
-        errorLog(`备份失败: ${errorMessage}`)
+        Logger.success('🎉 备份完成!', LogLevel.level0)
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        Logger.error(`备份失败: ${errorMessage}`)
         process.exit(1)
       }
     })

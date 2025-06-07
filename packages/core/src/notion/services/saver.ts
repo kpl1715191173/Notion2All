@@ -1,4 +1,4 @@
-import { logger, LogLevel } from '@notion2all/utils'
+import { Logger, LogLevel } from '@notion2all/utils'
 import { promises as fs } from 'fs'
 import path from 'path'
 import { PageObject, SaveResult } from '../types'
@@ -42,7 +42,7 @@ export class NotionPageSaver {
 
       await this.ensureDirectoryExists(path.dirname(filePath))
       
-      logger.log(`[保存] 保存页面 ${pageId} 到 ${filePath}`, LogLevel.level2)
+      Logger.log(`[保存] 保存页面 ${pageId} 到 ${filePath}`, LogLevel.level2)
       await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8')
 
       return {
@@ -51,7 +51,7 @@ export class NotionPageSaver {
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
-      logger.error(`[保存] 保存页面 ${pageId} 失败: ${errorMessage}`, LogLevel.level2)
+      Logger.error(`[保存] 保存页面 ${pageId} 失败: ${errorMessage}`, LogLevel.level2)
       return {
         success: false,
         error: errorMessage,
@@ -71,7 +71,7 @@ export class NotionPageSaver {
     try {
       await fs.access(dirPath)
     } catch {
-      logger.log(`[保存] 创建目录 ${dirPath}`, LogLevel.level2)
+      Logger.log(`[保存] 创建目录 ${dirPath}`, LogLevel.level2)
       await fs.mkdir(dirPath, { recursive: true })
     }
   }

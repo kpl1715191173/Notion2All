@@ -2,7 +2,7 @@ import { NotionDataFetcher } from './fetcher'
 import { NotionCacheService } from './cache'
 import { NotionPageSaver } from './saver'
 import { NotionFileDownloader } from './file-downloader'
-import { isChildPage, logger, LogLevel } from '@notion2all/utils'
+import { isChildPage, logger, LogLevel, NotionLogger } from '@notion2all/utils'
 
 /**
  * Notion 页面协调器
@@ -52,6 +52,8 @@ export class NotionPageCoordinator {
 
     // 设置日志级别
     logger.setLogLevel(this.config.logLevel)
+    // 同时也设置NotionLogger的日志级别
+    NotionLogger.getNotionInstance().setLogLevel(this.config.logLevel)
   }
 
   /**
@@ -92,7 +94,7 @@ export class NotionPageCoordinator {
     const { pageId, parentPageIds = [] } = options
 
     try {
-      logger.notion.processStart(pageId, parentPageIds)
+      NotionLogger.processStart(pageId, parentPageIds)
 
       // 1. 获取页面数据
       const pageData = await this.fetcher.fetchPageData({ pageId })
@@ -105,16 +107,16 @@ export class NotionPageCoordinator {
       })
 
       if (!needsUpdate) {
-        logger.notion.useCache(pageId)
+        NotionLogger.useCache(pageId)
         return
       }
 
       // 3. 获取完整数据
-      logger.notion.fetchData(pageId)
+      NotionLogger.fetchData(pageId)
       const fullData = await this.fetcher.fetchFullPageData({ pageId })
 
       // 4. 保存数据
-      logger.notion.saveData(pageId)
+      NotionLogger.saveData(pageId)
       const saveResult = await this.saver.savePageData({
         pageId,
         data: fullData,
@@ -128,7 +130,7 @@ export class NotionPageCoordinator {
       if (this.config.includeImages) {
         const imageUrls = this.extractImageUrls(fullData.children)
         if (imageUrls.length > 0) {
-          logger.notion.downloadFiles(pageId, imageUrls.length)
+          NotionLogger.downloadFiles(pageId, imageUrls.length)
           await this.fileDownloader.saveFiles({
             pageId,
             files: imageUrls,
@@ -143,7 +145,7 @@ export class NotionPageCoordinator {
       if (this.config.recursive) {
         const childPages = fullData.children.filter(block => isChildPage(block))
         if (childPages.length > 0) {
-          logger.notion.childPages(pageId, childPages.length)
+          NotionLogger.childPages(pageId, childPages.length)
 
           if (!this.config.concurrency || this.config.concurrency <= 0) {
             // 串行处理
@@ -155,10 +157,10 @@ export class NotionPageCoordinator {
               })
             }
             const timeUsed = (Number(process.hrtime.bigint() - startTime) / 1_000_000).toFixed(2)
-            logger.notion.serialComplete(pageId, childPages.length, timeUsed)
+            NotionLogger.serialComplete(pageId, childPages.length, timeUsed)
           } else {
             // 并发处理
-            logger.notion.concurrentProcess(this.config.concurrency, childPages.length)
+            NotionLogger.concurrentProcess(this.config.concurrency, childPages.length)
             const startTime = process.hrtime.bigint()
 
             // 分批处理子页面
@@ -174,12 +176,12 @@ export class NotionPageCoordinator {
             }
 
             const timeUsed = (Number(process.hrtime.bigint() - startTime) / 1_000_000).toFixed(2)
-            logger.notion.concurrentComplete(pageId, childPages.length, timeUsed)
+            NotionLogger.concurrentComplete(pageId, childPages.length, timeUsed)
           }
         }
       }
     } catch (error) {
-      logger.notion.error(pageId, error)
+      NotionLogger.error(pageId, error)
       throw error
     }
   }

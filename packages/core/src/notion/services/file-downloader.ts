@@ -4,7 +4,7 @@ import path from 'path'
 import https from 'https'
 import { SaveResult } from '../types'
 import { formatId } from '../utils'
-import { logger, LogLevel } from '@notion2all/utils'
+import { Logger, LogLevel } from '@notion2all/utils'
 
 interface DownloadProgress {
   downloaded: number
@@ -173,7 +173,7 @@ export class NotionFileDownloader {
         if (currentRetry >= retryCount) {
           throw new Error(`下载失败，已重试${retryCount}次: ${error instanceof Error ? error.message : String(error)}`)
         }
-        logger.warning(`[下载] 下载出错，正在进行第${currentRetry}次重试...`, logLevel)
+        Logger.warning(`[下载] 下载出错，正在进行第${currentRetry}次重试...`, logLevel)
         await new Promise(resolve => setTimeout(resolve, 1000 * currentRetry)) // 重试延迟
       }
     }
@@ -213,7 +213,7 @@ export class NotionFileDownloader {
       const filePath = path.join(fileDir, fileName)
       
       // 下载文件
-      logger.log(`[下载] 开始下载文件 ${blockId} 到 ${filePath}`, logLevel)
+      Logger.log(`[下载] 开始下载文件 ${blockId} 到 ${filePath}`, logLevel)
       await this.downloadFileWithChunks(fileUrl, filePath, {
         ...options,
         onProgress: (progress) => {
@@ -221,7 +221,7 @@ export class NotionFileDownloader {
             options.onProgress(progress)
           }
           if (progress.percentage % 20 === 0 || progress.percentage === 100) {
-            logger.log(
+            Logger.log(
               `[下载] 文件 ${blockId} 下载进度: ${progress.percentage}% (${Math.round(progress.downloaded / 1024)}KB/${Math.round(progress.total / 1024)}KB)`,
               logLevel
             )
@@ -229,14 +229,14 @@ export class NotionFileDownloader {
         }
       })
       
-      logger.log(`[下载] 文件 ${blockId} 下载完成`, logLevel)
+      Logger.log(`[下载] 文件 ${blockId} 下载完成`, logLevel)
       return {
         success: true,
         filePath
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
-      logger.error(`[下载] 文件 ${blockId} 下载失败: ${errorMessage}`, logLevel)
+      Logger.error(`[下载] 文件 ${blockId} 下载失败: ${errorMessage}`, logLevel)
       return {
         success: false,
         error: errorMessage
@@ -262,7 +262,7 @@ export class NotionFileDownloader {
     const results: SaveResult[] = []
     const logLevel = options.logLevel ?? LogLevel.level2
     
-    logger.log(`[下载] 开始下载 ${files.length} 个文件`, logLevel)
+    Logger.log(`[下载] 开始下载 ${files.length} 个文件`, logLevel)
     
     for (const file of files) {
       const result = await this.saveFile({
@@ -275,7 +275,7 @@ export class NotionFileDownloader {
     }
     
     const successCount = results.filter(r => r.success).length
-    logger.log(`[下载] 文件下载完成，成功: ${successCount}/${files.length}`, logLevel)
+    Logger.log(`[下载] 文件下载完成，成功: ${successCount}/${files.length}`, logLevel)
     
     return results
   }

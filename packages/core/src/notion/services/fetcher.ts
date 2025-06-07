@@ -1,6 +1,6 @@
 import { NotionApi } from '../api'
 import { NotionBlock, PageObject } from '../types'
-import { logger, LogLevel } from '@notion2all/utils'
+import { Logger, LogLevel } from '@notion2all/utils'
 
 /**
  * Notion 数据获取器
@@ -16,14 +16,14 @@ export class NotionDataFetcher {
   async fetchPageData(config: { pageId: string }): Promise<PageObject> {
     const { pageId } = config
     try {
-      logger.log(`[网络请求] 获取页面 ${pageId} 的基本信息`, LogLevel.level1)
+      Logger.log(`[网络请求] 获取页面 ${pageId} 的基本信息`, LogLevel.level1)
       const pageData = await this.notionApi.getPage({ pageId })
       return {
         ...pageData,
         children: [],
       }
     } catch (error) {
-      logger.error(
+      Logger.error(
         `[错误] 获取页面 ${pageId} 失败: ${error instanceof Error ? error.message : String(error)}`,
         LogLevel.level1
       )
@@ -38,21 +38,21 @@ export class NotionDataFetcher {
   async fetchBlockChildren(config: { blockId: string }): Promise<NotionBlock[]> {
     const { blockId } = config
     try {
-      logger.log(`[网络请求] 获取块 ${blockId} 的子块列表`, LogLevel.level1)
+      Logger.log(`[网络请求] 获取块 ${blockId} 的子块列表`, LogLevel.level1)
       const children = await this.notionApi.getBlockChildren({ blockId })
 
       if (!children || !Array.isArray(children)) {
-        logger.warning(`[警告] 块 ${blockId} 的子块数据格式不正确`, LogLevel.level1)
+        Logger.warning(`[警告] 块 ${blockId} 的子块数据格式不正确`, LogLevel.level1)
         return []
       }
 
-      logger.log(`[网络请求] 块 ${blockId} 获取到 ${children.length} 个子块`, LogLevel.level1)
+      Logger.log(`[网络请求] 块 ${blockId} 获取到 ${children.length} 个子块`, LogLevel.level1)
       return children.map(block => ({
         ...block,
         children: (block as any).has_children ? [] : undefined,
       })) as NotionBlock[]
     } catch (error) {
-      logger.error(
+      Logger.error(
         `[错误] 获取块 ${blockId} 的子块失败: ${error instanceof Error ? error.message : String(error)}`,
         LogLevel.level1
       )
@@ -82,7 +82,7 @@ export class NotionDataFetcher {
             }
             results.push(block)
           } catch (error) {
-            logger.error(
+            Logger.error(
               `[错误] 处理块 ${block.id} 的子块失败: ${error instanceof Error ? error.message : String(error)}`,
               LogLevel.level1
             )
@@ -97,7 +97,7 @@ export class NotionDataFetcher {
       pageData.children = await processChildren(children)
       return pageData
     } catch (error) {
-      logger.error(
+      Logger.error(
         `[错误] 获取页面 ${pageId} 的完整数据失败: ${error instanceof Error ? error.message : String(error)}`,
         LogLevel.level1
       )

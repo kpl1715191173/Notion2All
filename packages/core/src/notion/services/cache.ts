@@ -1,4 +1,4 @@
-import { logger, LogLevel } from '@notion2all/utils'
+import { Logger, LogLevel } from '@notion2all/utils'
 import { promises as fs } from 'fs'
 import path from 'path'
 import { PageObject } from '../types'
@@ -35,7 +35,7 @@ export class NotionCacheService {
       const cacheExists = await this.checkCacheExists(cachePath)
 
       if (!cacheExists) {
-        logger.log(`[缓存] 页面 ${pageId} 没有缓存记录`, LogLevel.level2)
+        Logger.log(`[缓存] 页面 ${pageId} 没有缓存记录`, LogLevel.level2)
         return true
       }
 
@@ -43,14 +43,14 @@ export class NotionCacheService {
       const needsUpdate = cacheData.last_edited_time !== lastEditedTime
 
       if (needsUpdate) {
-        logger.log(`[缓存] 页面 ${pageId} 需要更新，最后编辑时间已变更`, LogLevel.level2)
+        Logger.log(`[缓存] 页面 ${pageId} 需要更新，最后编辑时间已变更`, LogLevel.level2)
       } else {
-        logger.log(`[缓存] 页面 ${pageId} 使用缓存，内容未变更`, LogLevel.level2)
+        Logger.log(`[缓存] 页面 ${pageId} 使用缓存，内容未变更`, LogLevel.level2)
       }
 
       return needsUpdate
     } catch (error) {
-      logger.error(
+      Logger.error(
         `[缓存] 检查页面 ${pageId} 缓存状态失败: ${error instanceof Error ? error.message : String(error)}`,
         LogLevel.level2
       )
@@ -79,7 +79,7 @@ export class NotionCacheService {
       const fileContent = await fs.readFile(filePath, 'utf-8')
       return JSON.parse(fileContent)
     } catch (error) {
-      console.log(`[缓存读取] 页面 ${pageId} 本地文件不存在或读取失败`)
+      Logger.log(`[缓存读取] 页面 ${pageId} 本地文件不存在或读取失败`, LogLevel.level2)
       return null
     }
   }
@@ -106,7 +106,7 @@ export class NotionCacheService {
       const content = await fs.readFile(cachePath, 'utf-8')
       return JSON.parse(content)
     } catch (error) {
-      logger.error(
+      Logger.error(
         `[缓存] 读取缓存文件失败: ${error instanceof Error ? error.message : String(error)}`,
         LogLevel.level2
       )
