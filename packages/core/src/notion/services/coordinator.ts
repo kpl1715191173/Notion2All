@@ -2,7 +2,7 @@ import { NotionDataFetcher } from './fetcher'
 import { NotionCacheService } from './cache'
 import { NotionPageSaver } from './saver'
 import { NotionFileDownloader } from './file-downloader'
-import { isChildPage, logger, LogLevel, NotionLogger } from '@notion2all/utils'
+import { isChildPage, logger, LogLevel, NotionBackupLogger } from '@notion2all/utils'
 
 /**
  * Notion 页面协调器
@@ -17,7 +17,7 @@ export class NotionPageCoordinator {
     recursive?: boolean
     includeImages?: boolean
     concurrency?: number
-    logLevel?: LogLevel
+    logLevel?: LogLevel   
   }
 
   /**
@@ -31,11 +31,11 @@ export class NotionPageCoordinator {
     fetcher: NotionDataFetcher
     cacheService: NotionCacheService
     saver: NotionPageSaver
-    config?: {
-      recursive?: boolean
-      includeImages?: boolean
-      concurrency?: number
-      logLevel?: LogLevel
+    config: {
+      recursive: boolean
+      includeImages: boolean
+      concurrency: number
+      logLevel: LogLevel
     }
   }) {
     this.fetcher = options.fetcher
@@ -44,16 +44,11 @@ export class NotionPageCoordinator {
     this.config = options.config || {}
 
     this.fileDownloader = new NotionFileDownloader(this.saver.getOutputDir())
-    // 设置默认值
-    this.config.recursive = this.config.recursive ?? true
-    this.config.includeImages = this.config.includeImages ?? false
-    this.config.concurrency = this.config.concurrency ?? 5
-    this.config.logLevel = this.config.logLevel ?? LogLevel.level0
 
     // 设置日志级别
-    logger.setLogLevel(this.config.logLevel)
-    // 同时也设置NotionLogger的日志级别
-    NotionLogger.getNotionInstance().setLogLevel(this.config.logLevel)
+    logger.setLogLevel(this.config.logLevel!)
+    // 同时也设置NotionBackupLogger的日志级别
+    NotionBackupLogger.getNotionInstance().setLogLevel(this.config.logLevel!)
   }
 
   /**
@@ -94,7 +89,7 @@ export class NotionPageCoordinator {
     const { pageId, parentPageIds = [] } = options
 
     try {
-      NotionLogger.processStart(pageId, parentPageIds)
+      NotionBackupLogger.processStart(pageId, parentPageIds)
 
       // 1. 获取页面数据
       const pageData = await this.fetcher.fetchPageData({ pageId })
@@ -107,16 +102,16 @@ export class NotionPageCoordinator {
       })
 
       if (!needsUpdate) {
-        NotionLogger.useCache(pageId)
+        NotionBackupLogger.useCache(pageId)
         return
       }
 
       // 3. 获取完整数据
-      NotionLogger.fetchData(pageId)
+      NotionBackupLogger.fetchData(pageId)
       const fullData = await this.fetcher.fetchFullPageData({ pageId })
 
       // 4. 保存数据
-      NotionLogger.saveData(pageId)
+      NotionBackupLogger.saveData(pageId)
       const saveResult = await this.saver.savePageData({
         pageId,
         data: fullData,
@@ -130,7 +125,7 @@ export class NotionPageCoordinator {
       if (this.config.includeImages) {
         const imageUrls = this.extractImageUrls(fullData.children)
         if (imageUrls.length > 0) {
-          NotionLogger.downloadFiles(pageId, imageUrls.length)
+          NotionBackupLogger.downloadFiles(pageId, imageUrls.length)
           await this.fileDownloader.saveFiles({
             pageId,
             files: imageUrls,
@@ -145,7 +140,7 @@ export class NotionPageCoordinator {
       if (this.config.recursive) {
         const childPages = fullData.children.filter(block => isChildPage(block))
         if (childPages.length > 0) {
-          NotionLogger.childPages(pageId, childPages.length)
+          NotionBackupLogger.childPages(pageId, childPages.length)
 
           if (!this.config.concurrency || this.config.concurrency <= 0) {
             // 串行处理
@@ -157,10 +152,10 @@ export class NotionPageCoordinator {
               })
             }
             const timeUsed = (Number(process.hrtime.bigint() - startTime) / 1_000_000).toFixed(2)
-            NotionLogger.serialComplete(pageId, childPages.length, timeUsed)
+            NotionBackupLogger.serialComplete(pageId, childPages.length, timeUsed)
           } else {
             // 并发处理
-            NotionLogger.concurrentProcess(this.config.concurrency, childPages.length)
+            NotionBackupLogger.concurrentProcess(this.config.concurrency, childPages.length)
             const startTime = process.hrtime.bigint()
 
             // 分批处理子页面
@@ -176,12 +171,12 @@ export class NotionPageCoordinator {
             }
 
             const timeUsed = (Number(process.hrtime.bigint() - startTime) / 1_000_000).toFixed(2)
-            NotionLogger.concurrentComplete(pageId, childPages.length, timeUsed)
+            NotionBackupLogger.concurrentComplete(pageId, childPages.length, timeUsed)
           }
         }
       }
     } catch (error) {
-      NotionLogger.error(pageId, error)
+      NotionBackupLogger.error(pageId, error)
       throw error
     }
   }

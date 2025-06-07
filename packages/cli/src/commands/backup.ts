@@ -158,7 +158,7 @@ export const backupCommand = (program: Command) => {
                       config.includeAttachments === 'onlyPic' ||
                       config.includeAttachments === 'all',
                     concurrency: config.concurrency,
-                    logLevel: parseInt(options.logLevel, 10) as LogLevel,
+                    logLevel: 3 as LogLevel,
                   },
                 })
 
@@ -213,9 +213,7 @@ export const backupCommand = (program: Command) => {
                         config.includeAttachments === 'onlyPic' ||
                         config.includeAttachments === 'all',
                       concurrency: config.concurrency,
-                      logLevel: options.logRecursive
-                        ? LogLevel.level2
-                        : (parseInt(options.logLevel, 10) as LogLevel),
+                      logLevel: config.logLevel,
                     },
                   })
 
