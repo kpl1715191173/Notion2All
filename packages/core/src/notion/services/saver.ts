@@ -1,4 +1,4 @@
-import { Logger, LogLevel } from '@notion2all/utils'
+import { LogLevel, NotionBackupLogger } from '@notion2all/utils'
 import { promises as fs } from 'fs'
 import path from 'path'
 import { PageObject, SaveResult } from '../types'
@@ -9,7 +9,19 @@ import { formatId } from '../utils'
  * 负责将页面数据保存到本地文件系统
  */
 export class NotionPageSaver {
-  constructor(private outputDir: string) {}
+  private logLevel: LogLevel
+
+  constructor(private outputDir: string, config?: { logLevel?: LogLevel }) {
+    this.logLevel = config?.logLevel || LogLevel.level0
+  }
+
+  /**
+   * 设置日志级别
+   * @param level 日志级别
+   */
+  setLogLevel(level: LogLevel): void {
+    this.logLevel = level
+  }
 
   /**
    * 获取输出目录路径
@@ -42,7 +54,7 @@ export class NotionPageSaver {
 
       await this.ensureDirectoryExists(path.dirname(filePath))
       
-      Logger.log(`[保存] 保存页面 ${pageId} 到 ${filePath}`, LogLevel.level2)
+      NotionBackupLogger.log(`[保存] 保存页面 ${pageId} 到 ${filePath}`, this.logLevel)
       await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8')
 
       return {
@@ -50,11 +62,10 @@ export class NotionPageSaver {
         filePath,
       }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error)
-      Logger.error(`[保存] 保存页面 ${pageId} 失败: ${errorMessage}`, LogLevel.level2)
+      NotionBackupLogger.error(pageId, error, this.logLevel)
       return {
         success: false,
-        error: errorMessage,
+        error: error instanceof Error ? error.message : String(error),
       }
     }
   }
@@ -71,7 +82,7 @@ export class NotionPageSaver {
     try {
       await fs.access(dirPath)
     } catch {
-      Logger.log(`[保存] 创建目录 ${dirPath}`, LogLevel.level2)
+      NotionBackupLogger.log(`[保存] 创建目录 ${dirPath}`, this.logLevel)
       await fs.mkdir(dirPath, { recursive: true })
     }
   }

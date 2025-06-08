@@ -4,7 +4,7 @@ import path from 'path'
 import https from 'https'
 import { SaveResult } from '../types'
 import { formatId } from '../utils'
-import { Logger, LogLevel } from '@notion2all/utils'
+import { LogLevel, NotionBackupLogger } from '@notion2all/utils'
 
 interface DownloadProgress {
   downloaded: number
@@ -30,8 +30,19 @@ export class NotionFileDownloader {
   private readonly DEFAULT_RETRY_COUNT = 3
   private readonly DEFAULT_PROGRESS_INTERVAL = 2000 // 2秒
   private readonly DEFAULT_PROGRESS_THRESHOLD = 5 // 5%
+  private logLevel: LogLevel
 
-  constructor(private outputDir: string) {}
+  constructor(private outputDir: string, config?: { logLevel?: LogLevel }) {
+    this.logLevel = config?.logLevel || LogLevel.level0
+  }
+
+  /**
+   * 设置日志级别
+   * @param level 日志级别
+   */
+  setLogLevel(level: LogLevel): void {
+    this.logLevel = level
+  }
 
   /**
    * 生成文件名
@@ -106,7 +117,7 @@ export class NotionFileDownloader {
       chunkSize = this.DEFAULT_CHUNK_SIZE,
       onProgress,
       retryCount = this.DEFAULT_RETRY_COUNT,
-      logLevel = LogLevel.level2,
+      logLevel = this.logLevel,
       progressInterval = this.DEFAULT_PROGRESS_INTERVAL,
       progressThreshold = this.DEFAULT_PROGRESS_THRESHOLD
     } = options
@@ -173,7 +184,7 @@ export class NotionFileDownloader {
         if (currentRetry >= retryCount) {
           throw new Error(`下载失败，已重试${retryCount}次: ${error instanceof Error ? error.message : String(error)}`)
         }
-        Logger.warning(`[下载] 下载出错，正在进行第${currentRetry}次重试...`, logLevel)
+        NotionBackupLogger.warning(`[下载] 下载出错，正在进行第${currentRetry}次重试...`, logLevel)
         await new Promise(resolve => setTimeout(resolve, 1000 * currentRetry)) // 重试延迟
       }
     }
@@ -198,7 +209,7 @@ export class NotionFileDownloader {
     }
   ): Promise<SaveResult> {
     const { pageId, blockId, fileUrl, options = {} } = config;
-    const logLevel = options.logLevel ?? LogLevel.level2
+    const logLevel = options.logLevel ?? this.logLevel
 
     try {
       // 生成文件名
@@ -213,7 +224,7 @@ export class NotionFileDownloader {
       const filePath = path.join(fileDir, fileName)
       
       // 下载文件
-      Logger.log(`[下载] 开始下载文件 ${blockId} 到 ${filePath}`, logLevel)
+      NotionBackupLogger.log(`[下载] 开始下载文件 ${blockId} 到 ${filePath}`, logLevel)
       await this.downloadFileWithChunks(fileUrl, filePath, {
         ...options,
         onProgress: (progress) => {
@@ -221,7 +232,7 @@ export class NotionFileDownloader {
             options.onProgress(progress)
           }
           if (progress.percentage % 20 === 0 || progress.percentage === 100) {
-            Logger.log(
+            NotionBackupLogger.log(
               `[下载] 文件 ${blockId} 下载进度: ${progress.percentage}% (${Math.round(progress.downloaded / 1024)}KB/${Math.round(progress.total / 1024)}KB)`,
               logLevel
             )
@@ -229,14 +240,14 @@ export class NotionFileDownloader {
         }
       })
       
-      Logger.log(`[下载] 文件 ${blockId} 下载完成`, logLevel)
+      NotionBackupLogger.log(`[下载] 文件 ${blockId} 下载完成`, logLevel)
       return {
         success: true,
         filePath
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
-      Logger.error(`[下载] 文件 ${blockId} 下载失败: ${errorMessage}`, logLevel)
+      NotionBackupLogger.error(blockId, error, logLevel)
       return {
         success: false,
         error: errorMessage
@@ -258,24 +269,31 @@ export class NotionFileDownloader {
       options?: DownloadOptions;
     }
   ): Promise<SaveResult[]> {
-    const { pageId, files, options = {} } = config;
+    const { pageId, files, options = {} } = config
+    const logLevel = options.logLevel ?? this.logLevel
     const results: SaveResult[] = []
-    const logLevel = options.logLevel ?? LogLevel.level2
-    
-    Logger.log(`[下载] 开始下载 ${files.length} 个文件`, logLevel)
-    
-    for (const file of files) {
+
+    NotionBackupLogger.log(`[批量下载] 开始下载页面 ${pageId} 的 ${files.length} 个文件`, logLevel)
+
+    for (let i = 0; i < files.length; i++) {
+      const { blockId, url } = files[i]
+      NotionBackupLogger.log(`[批量下载] 处理第 ${i + 1}/${files.length} 个文件 (${blockId})`, logLevel)
+      
       const result = await this.saveFile({
         pageId,
-        blockId: file.blockId,
-        fileUrl: file.url,
+        blockId,
+        fileUrl: url,
         options
       })
+      
       results.push(result)
     }
-    
+
     const successCount = results.filter(r => r.success).length
-    Logger.log(`[下载] 文件下载完成，成功: ${successCount}/${files.length}`, logLevel)
+    NotionBackupLogger.log(
+      `[批量下载] 页面 ${pageId} 的文件下载完成，成功: ${successCount}/${files.length}`,
+      logLevel
+    )
     
     return results
   }

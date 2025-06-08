@@ -1,13 +1,17 @@
 import { NotionApi } from '../api'
 import { NotionBlock, PageObject } from '../types'
-import { Logger, LogLevel } from '@notion2all/utils'
+import { LogLevel, NotionBackupLogger } from '@notion2all/utils'
 
 /**
  * Notion 数据获取器
  * 负责从 Notion API 获取数据
  */
 export class NotionDataFetcher {
-  constructor(private notionApi: NotionApi) {}
+  private logLevel: LogLevel
+
+  constructor(private notionApi: NotionApi, config?: { logLevel?: LogLevel }) {
+    this.logLevel = config?.logLevel || LogLevel.level0
+  }
 
   /**
    * 获取页面的基本信息
@@ -16,17 +20,14 @@ export class NotionDataFetcher {
   async fetchPageData(config: { pageId: string }): Promise<PageObject> {
     const { pageId } = config
     try {
-      Logger.log(`[网络请求] 获取页面 ${pageId} 的基本信息`, LogLevel.level1)
+      NotionBackupLogger.fetchData(pageId, this.logLevel)
       const pageData = await this.notionApi.getPage({ pageId })
       return {
         ...pageData,
         children: [],
       }
     } catch (error) {
-      Logger.error(
-        `[错误] 获取页面 ${pageId} 失败: ${error instanceof Error ? error.message : String(error)}`,
-        LogLevel.level1
-      )
+      NotionBackupLogger.error(pageId, error, this.logLevel)
       throw error
     }
   }
@@ -38,24 +39,21 @@ export class NotionDataFetcher {
   async fetchBlockChildren(config: { blockId: string }): Promise<NotionBlock[]> {
     const { blockId } = config
     try {
-      Logger.log(`[网络请求] 获取块 ${blockId} 的子块列表`, LogLevel.level1)
+      NotionBackupLogger.fetchBlockChildren(blockId, this.logLevel)
       const children = await this.notionApi.getBlockChildren({ blockId })
 
       if (!children || !Array.isArray(children)) {
-        Logger.warning(`[警告] 块 ${blockId} 的子块数据格式不正确`, LogLevel.level1)
+        NotionBackupLogger.warning(`[警告] 块 ${blockId} 的子块数据格式不正确`, this.logLevel)
         return []
       }
 
-      Logger.log(`[网络请求] 块 ${blockId} 获取到 ${children.length} 个子块`, LogLevel.level1)
+      NotionBackupLogger.fetchBlockChildrenComplete(blockId, children.length, this.logLevel)
       return children.map(block => ({
         ...block,
         children: (block as any).has_children ? [] : undefined,
       })) as NotionBlock[]
     } catch (error) {
-      Logger.error(
-        `[错误] 获取块 ${blockId} 的子块失败: ${error instanceof Error ? error.message : String(error)}`,
-        LogLevel.level1
-      )
+      NotionBackupLogger.error(blockId, error, this.logLevel)
       throw error
     }
   }
@@ -82,10 +80,7 @@ export class NotionDataFetcher {
             }
             results.push(block)
           } catch (error) {
-            Logger.error(
-              `[错误] 处理块 ${block.id} 的子块失败: ${error instanceof Error ? error.message : String(error)}`,
-              LogLevel.level1
-            )
+            NotionBackupLogger.error(block.id, error, this.logLevel)
             // 继续处理其他块
             results.push(block)
           }
@@ -97,11 +92,16 @@ export class NotionDataFetcher {
       pageData.children = await processChildren(children)
       return pageData
     } catch (error) {
-      Logger.error(
-        `[错误] 获取页面 ${pageId} 的完整数据失败: ${error instanceof Error ? error.message : String(error)}`,
-        LogLevel.level1
-      )
+      NotionBackupLogger.error(pageId, error, this.logLevel)
       throw error
     }
+  }
+
+  /**
+   * 设置日志级别
+   * @param level 日志级别
+   */
+  setLogLevel(level: LogLevel): void {
+    this.logLevel = level
   }
 }
