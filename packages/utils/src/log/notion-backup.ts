@@ -1,4 +1,4 @@
-import { Logger, LogLevel } from './base'
+import { Logger, LogLevel, IndentLevel } from './base'
 
 /**
  * Notion备份专用日志管理器
@@ -6,22 +6,15 @@ import { Logger, LogLevel } from './base'
  * 最佳实践:
  * 1. 使用configureLogging()函数统一设置日志级别
  * 2. 直接使用静态方法如NotionBackupLogger.log()记录日志
- * 3. 始终指定日志级别参数，确保日志输出行为一致
- * 4. 避免直接使用getInstance()方法，推荐使用getNotionInstance()
+ * 3. 避免直接使用getInstance()方法，推荐使用getNotionInstance()
  */
 export class NotionBackupLogger extends Logger {
   private static notionInstance: NotionBackupLogger
 
   private constructor() {
     super()
-    // 确保NotionBackupLogger默认也使用level1级别的日志
-    this.setLogLevel(LogLevel.level1)
   }
 
-  /**
-   * 获取NotionBackupLogger实例
-   * 推荐使用此方法获取日志实例
-   */
   static getNotionInstance(): NotionBackupLogger {
     if (!NotionBackupLogger.notionInstance) {
       NotionBackupLogger.notionInstance = new NotionBackupLogger()
@@ -29,200 +22,122 @@ export class NotionBackupLogger extends Logger {
     return NotionBackupLogger.notionInstance
   }
 
-  /**
-   * 获取NotionBackupLogger实例
-   * @deprecated 此方法已废弃，请使用getNotionInstance()方法
-   */
-  static getInstance(): NotionBackupLogger {
-    return NotionBackupLogger.getNotionInstance()
+  // 重写 log 方法，自动获取全局缩进等级并支持微调
+  log(message: string, adjust: number = 0): void {
+    const baseIndent = Logger.getInstance().getLogLevel()
+    const indentLevel = baseIndent + adjust
+    super.log(message, indentLevel)
   }
 
-  processStart(pageId: string, parentIds: string[] = [], level: LogLevel = LogLevel.level1): void {
-    if (this.shouldLog(level)) {
-      this.log(
-        `[开始处理] 页面 ${pageId}${
-          parentIds.length > 0 ? ` (父页面: ${parentIds.join(' -> ')})` : ''
-        }`,
-        level
-      )
-    }
+  // 新增 cacheLog 方法，专用于缓存相关日志，自动获取全局缩进等级
+  cacheLog(message: string, adjust: number = 0): void {
+    const baseIndent = Logger.getInstance().getLogLevel()
+    const indentLevel = baseIndent + adjust
+    super.log(message, indentLevel)
   }
 
-  useCache(pageId: string, level: LogLevel = LogLevel.level1): void {
-    if (this.shouldLog(level)) {
-      this.log(`[使用缓存] 页面 ${pageId} 使用本地缓存`, level)
-    }
+  // 业务相关日志方法，全部只传 message，内部自动缩进
+  processStart(pageId: string, parentIds: string[] = []): void {
+    this.log(
+      `[开始处理] 页面 ${pageId}${parentIds.length > 0 ? ` (父页面: ${parentIds.join(' -> ')})` : ''}`
+    )
   }
-
-  fetchData(pageId: string, level: LogLevel = LogLevel.level1): void {
-    if (this.shouldLog(level)) {
-      this.log(`[网络请求] 页面 ${pageId} 需要更新，获取完整内容`, level)
-    }
+  useCache(pageId: string): void {
+    this.log(`[使用缓存] 页面 ${pageId} 使用本地缓存`)
   }
-
-  fetchBlockChildren(blockId: string, level: LogLevel = LogLevel.level1): void {
-    if (this.shouldLog(level)) {
-      this.log(`[网络请求] 获取块 ${blockId} 的子块列表`, level)
-    }
+  fetchData(pageId: string): void {
+    this.log(`[网络请求] 页面 ${pageId} 需要更新，获取完整内容`)
   }
-
-  fetchBlockChildrenComplete(
-    blockId: string,
-    count: number,
-    level: LogLevel = LogLevel.level1
-  ): void {
-    if (this.shouldLog(level)) {
-      this.log(`[网络请求] 块 ${blockId} 获取到 ${count} 个子块`, level)
-    }
+  fetchBlock(blockId: string): void {
+    this.log(`[网络请求] 获取块 ${blockId} 的子块列表`)
   }
-
-  saveData(pageId: string, level: LogLevel = LogLevel.level1): void {
-    if (this.shouldLog(level)) {
-      this.log(`[保存文件] 保存页面 ${pageId} 的完整内容`, level)
-    }
+  fetchBlockChildren(blockId: string, count?: number): void {
+    this.log(`[网络请求] 块 ${blockId} 获取到 ${count ?? 0} 个子块`)
   }
-
-  downloadFiles(pageId: string, count: number, level: LogLevel = LogLevel.level1): void {
-    if (this.shouldLog(level)) {
-      this.log(`[下载文件] 页面 ${pageId} 发现 ${count} 个文件`, level)
-    }
+  saveData(pageId: string): void {
+    this.log(`[保存文件] 保存页面 ${pageId} 的完整内容`)
   }
-
-  childPages(pageId: string, count: number, level: LogLevel = LogLevel.level1): void {
-    if (this.shouldLog(level)) {
-      this.log(`[子页面处理] ${pageId} 有 ${count} 个子页面需要处理`, level)
-    }
+  downloadFiles(pageId: string, count: number): void {
+    this.log(`[下载文件] 页面 ${pageId} 发现 ${count} 个文件`)
   }
-
-  serialComplete(
-    pageId: string,
-    count: number,
-    time: string,
-    level: LogLevel = LogLevel.level1
-  ): void {
-    if (this.shouldLog(level)) {
-      this.log(`[串行子页面] 页面 ${pageId} 的 ${count} 个子页面处理完成，耗时: ${time} ms`, level)
-    }
+  childPages(pageId: string, count: number): void {
+    this.log(`[子页面处理] ${pageId} 有 ${count} 个子页面需要处理`)
   }
-
-  concurrentProcess(count: number, childCount: number, level: LogLevel = LogLevel.level1): void {
-    if (this.shouldLog(level)) {
-      this.log(`[并发处理] 使用并发数 ${count} 处理 ${childCount} 个子页面`, level)
-    }
+  serialComplete(pageId: string, count: number, time: string): void {
+    this.log(`[串行子页面] 页面 ${pageId} 的 ${count} 个子页面处理完成，耗时: ${time} ms`)
   }
-
-  concurrentComplete(
-    pageId: string,
-    count: number,
-    time: string,
-    level: LogLevel = LogLevel.level1
-  ): void {
-    if (this.shouldLog(level)) {
-      this.log(`[并发子页面] 页面 ${pageId} 的 ${count} 个子页面处理完成，耗时: ${time} ms`, level)
-    }
+  concurrentProcess(count: number, childCount: number): void {
+    this.log(`[并发处理] 使用并发数 ${count} 处理 ${childCount} 个子页面`)
   }
-
-  error(pageId: string, error: any, level: LogLevel = LogLevel.level1): void {
-    if (this.shouldLog(level)) {
-      this.error(
-        `[错误] 处理页面 ${pageId} 失败: ${error instanceof Error ? error.message : String(error)}`,
-        level
-      )
-    }
+  concurrentComplete(pageId: string, count: number, time: string): void {
+    this.log(`[并发子页面] 页面 ${pageId} 的 ${count} 个子页面处理完成，耗时: ${time} ms`)
   }
-
-  warning(message: string, level: LogLevel = LogLevel.level1): void {
-    if (this.shouldLog(level)) {
-      this.warning(message, level)
-    }
+  error(pageId: string, error: any): void {
+    const baseIndent = Logger.getInstance().getLogLevel()
+    super.error(
+      `[错误] 处理页面 ${pageId} 失败: ${error instanceof Error ? error.message : String(error)}`,
+      baseIndent
+    )
+  }
+  warning(message: string): void {
+    const baseIndent = Logger.getInstance().getLogLevel()
+    super.warning(message, baseIndent)
   }
 
   // 静态方法提供便捷的日志访问
-  static processStart(
-    pageId: string,
-    parentIds: string[] = [],
-    level: LogLevel = LogLevel.level1
-  ): void {
-    NotionBackupLogger.getNotionInstance().processStart(pageId, parentIds, level)
+  static processStart(pageId: string, parentIds: string[] = []): void {
+    NotionBackupLogger.getNotionInstance().processStart(pageId, parentIds)
   }
-
-  static useCache(pageId: string, level: LogLevel = LogLevel.level1): void {
-    NotionBackupLogger.getNotionInstance().useCache(pageId, level)
+  static useCache(pageId: string): void {
+    NotionBackupLogger.getNotionInstance().useCache(pageId)
   }
-
-  static fetchData(pageId: string, level: LogLevel = LogLevel.level1): void {
-    NotionBackupLogger.getNotionInstance().fetchData(pageId, level)
+  static fetchData(pageId: string): void {
+    NotionBackupLogger.getNotionInstance().fetchData(pageId)
   }
-
-  static fetchBlockChildren(blockId: string, level: LogLevel = LogLevel.level1): void {
-    NotionBackupLogger.getNotionInstance().fetchBlockChildren(blockId, level)
+  static fetchBlock(blockId: string): void {
+    NotionBackupLogger.getNotionInstance().fetchBlock(blockId)
   }
-
-  static fetchBlockChildrenComplete(
-    blockId: string,
-    count: number,
-    level: LogLevel = LogLevel.level1
-  ): void {
-    NotionBackupLogger.getNotionInstance().fetchBlockChildrenComplete(blockId, count, level)
+  static fetchBlockChildren(blockId: string, count?: number): void {
+    NotionBackupLogger.getNotionInstance().fetchBlockChildren(blockId, count)
   }
-
-  static saveData(pageId: string, level: LogLevel = LogLevel.level1): void {
-    NotionBackupLogger.getNotionInstance().saveData(pageId, level)
+  static saveData(pageId: string): void {
+    NotionBackupLogger.getNotionInstance().saveData(pageId)
   }
-
-  static downloadFiles(pageId: string, count: number, level: LogLevel = LogLevel.level1): void {
-    NotionBackupLogger.getNotionInstance().downloadFiles(pageId, count, level)
+  static downloadFiles(pageId: string, count: number): void {
+    NotionBackupLogger.getNotionInstance().downloadFiles(pageId, count)
   }
-
-  static childPages(pageId: string, count: number, level: LogLevel = LogLevel.level1): void {
-    NotionBackupLogger.getNotionInstance().childPages(pageId, count, level)
+  static childPages(pageId: string, count: number): void {
+    NotionBackupLogger.getNotionInstance().childPages(pageId, count)
   }
-
-  static serialComplete(
-    pageId: string,
-    count: number,
-    time: string,
-    level: LogLevel = LogLevel.level1
-  ): void {
-    NotionBackupLogger.getNotionInstance().serialComplete(pageId, count, time, level)
+  static serialComplete(pageId: string, count: number, time: string): void {
+    NotionBackupLogger.getNotionInstance().serialComplete(pageId, count, time)
   }
-
-  static concurrentProcess(
-    count: number,
-    childCount: number,
-    level: LogLevel = LogLevel.level1
-  ): void {
-    NotionBackupLogger.getNotionInstance().concurrentProcess(count, childCount, level)
+  static concurrentProcess(count: number, childCount: number): void {
+    NotionBackupLogger.getNotionInstance().concurrentProcess(count, childCount)
   }
-
-  static concurrentComplete(
-    pageId: string,
-    count: number,
-    time: string,
-    level: LogLevel = LogLevel.level1
-  ): void {
-    NotionBackupLogger.getNotionInstance().concurrentComplete(pageId, count, time, level)
+  static concurrentComplete(pageId: string, count: number, time: string): void {
+    NotionBackupLogger.getNotionInstance().concurrentComplete(pageId, count, time)
   }
-
-  static error(pageId: string, error: any, level: LogLevel = LogLevel.level1): void {
-    NotionBackupLogger.getNotionInstance().error(pageId, error, level)
+  static error(pageId: string, error: any): void {
+    NotionBackupLogger.getNotionInstance().error(pageId, error)
   }
-
-  static warning(message: string, level: LogLevel = LogLevel.level1): void {
-    NotionBackupLogger.getNotionInstance().warning(message, level)
+  static warning(message: string): void {
+    NotionBackupLogger.getNotionInstance().warning(message)
+  }
+  static cacheLog(message: string, adjust: number = 0): void {
+    NotionBackupLogger.getNotionInstance().cacheLog(message, adjust)
   }
 }
 
 /**
  * 配置全局日志系统
- * 使用此函数在应用程序启动时统一设置日志级别
+ * 使用此函数在应用程序启动时统一设置日志级别和缩进间隔
  * @param level 日志级别
+ * @param indentSpacing 缩进间隔
  */
-export function configureLogging(level: LogLevel): void {
-  // 设置NotionBackupLogger日志级别
-  NotionBackupLogger.getNotionInstance().setLogLevel(level)
-  // 同时设置基础Logger日志级别以保持一致性
-  Logger.getInstance().setLogLevel(level)
+export function configureLogging(level: LogLevel, indentSpacing?: number): void {
+  NotionBackupLogger.getNotionInstance().configureLogging(level, indentSpacing)
+  Logger.getInstance().configureLogging(level, indentSpacing)
 }
 
 // 导出Notion备份日志实例

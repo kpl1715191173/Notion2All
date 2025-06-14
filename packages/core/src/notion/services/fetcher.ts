@@ -9,8 +9,11 @@ import { LogLevel, NotionBackupLogger } from '@notion2all/utils'
 export class NotionDataFetcher {
   private logLevel: LogLevel
 
-  constructor(private notionApi: NotionApi, config?: { logLevel?: LogLevel }) {
-    this.logLevel = config?.logLevel || LogLevel.level0
+  constructor(
+    private notionApi: NotionApi,
+    config?: { logLevel?: LogLevel }
+  ) {
+    this.logLevel = config?.logLevel || LogLevel.info
   }
 
   /**
@@ -20,14 +23,14 @@ export class NotionDataFetcher {
   async fetchPageData(config: { pageId: string }): Promise<PageObject> {
     const { pageId } = config
     try {
-      NotionBackupLogger.fetchData(pageId, this.logLevel)
+      NotionBackupLogger.fetchData(pageId)
       const pageData = await this.notionApi.getPage({ pageId })
       return {
         ...pageData,
         children: [],
       }
     } catch (error) {
-      NotionBackupLogger.error(pageId, error, this.logLevel)
+      NotionBackupLogger.error(pageId, error)
       throw error
     }
   }
@@ -39,21 +42,20 @@ export class NotionDataFetcher {
   async fetchBlockChildren(config: { blockId: string }): Promise<NotionBlock[]> {
     const { blockId } = config
     try {
-      NotionBackupLogger.fetchBlockChildren(blockId, this.logLevel)
+      NotionBackupLogger.fetchBlockChildren(blockId)
       const children = await this.notionApi.getBlockChildren({ blockId })
 
       if (!children || !Array.isArray(children)) {
-        NotionBackupLogger.warning(`[警告] 块 ${blockId} 的子块数据格式不正确`, this.logLevel)
+        NotionBackupLogger.warning(`[警告] 块 ${blockId} 的子块数据格式不正确`)
         return []
       }
 
-      NotionBackupLogger.fetchBlockChildrenComplete(blockId, children.length, this.logLevel)
       return children.map(block => ({
         ...block,
         children: (block as any).has_children ? [] : undefined,
       })) as NotionBlock[]
     } catch (error) {
-      NotionBackupLogger.error(blockId, error, this.logLevel)
+      NotionBackupLogger.error(blockId, error)
       throw error
     }
   }
@@ -80,7 +82,7 @@ export class NotionDataFetcher {
             }
             results.push(block)
           } catch (error) {
-            NotionBackupLogger.error(block.id, error, this.logLevel)
+            NotionBackupLogger.error(block.id, error)
             // 继续处理其他块
             results.push(block)
           }
@@ -92,16 +94,8 @@ export class NotionDataFetcher {
       pageData.children = await processChildren(children)
       return pageData
     } catch (error) {
-      NotionBackupLogger.error(pageId, error, this.logLevel)
+      NotionBackupLogger.error(pageId, error)
       throw error
     }
-  }
-
-  /**
-   * 设置日志级别
-   * @param level 日志级别
-   */
-  setLogLevel(level: LogLevel): void {
-    this.logLevel = level
   }
 }

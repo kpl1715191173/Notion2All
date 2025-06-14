@@ -11,8 +11,11 @@ import { formatId } from '../utils'
 export class NotionPageSaver {
   private logLevel: LogLevel
 
-  constructor(private outputDir: string, config?: { logLevel?: LogLevel }) {
-    this.logLevel = config?.logLevel || LogLevel.level0
+  constructor(
+    private outputDir: string,
+    config?: { logLevel?: LogLevel }
+  ) {
+    this.logLevel = config?.logLevel || LogLevel.info
   }
 
   /**
@@ -38,14 +41,12 @@ export class NotionPageSaver {
    * @param config.parentPageIds 父页面ID链
    * @returns 保存结果
    */
-  async savePageData(
-    config: {
-      pageId: string;
-      data: PageObject;
-      parentPageIds?: string[];
-    }
-  ): Promise<SaveResult> {
-    const { pageId, data, parentPageIds = [] } = config;
+  async savePageData(config: {
+    pageId: string
+    data: PageObject
+    parentPageIds?: string[]
+  }): Promise<SaveResult> {
+    const { pageId, data, parentPageIds = [] } = config
     try {
       const formattedIds = parentPageIds.map(id => formatId(id))
       const formattedPageId = formatId(pageId)
@@ -53,8 +54,8 @@ export class NotionPageSaver {
       const filePath = path.join(pageDir, `${formattedPageId}.json`)
 
       await this.ensureDirectoryExists(path.dirname(filePath))
-      
-      NotionBackupLogger.log(`[保存] 保存页面 ${pageId} 到 ${filePath}`, this.logLevel)
+
+      NotionBackupLogger.log(`[保存] 保存页面 ${pageId} 到 ${filePath}`)
       await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8')
 
       return {
@@ -62,7 +63,7 @@ export class NotionPageSaver {
         filePath,
       }
     } catch (error) {
-      NotionBackupLogger.error(pageId, error, this.logLevel)
+      NotionBackupLogger.error(pageId, error)
       return {
         success: false,
         error: error instanceof Error ? error.message : String(error),
@@ -71,10 +72,8 @@ export class NotionPageSaver {
   }
 
   private getSavePath(config: { pageId: string; parentIds?: string[] }): string {
-    const { pageId, parentIds = [] } = config;
-    const relativePath = parentIds.length > 0
-      ? path.join(...parentIds, pageId)
-      : pageId
+    const { pageId, parentIds = [] } = config
+    const relativePath = parentIds.length > 0 ? path.join(...parentIds, pageId) : pageId
     return path.join(this.outputDir, `${relativePath}.json`)
   }
 
@@ -82,8 +81,8 @@ export class NotionPageSaver {
     try {
       await fs.access(dirPath)
     } catch {
-      NotionBackupLogger.log(`[保存] 创建目录 ${dirPath}`, this.logLevel)
+      NotionBackupLogger.log(`[保存] 创建目录 ${dirPath}`)
       await fs.mkdir(dirPath, { recursive: true })
     }
   }
-} 
+}

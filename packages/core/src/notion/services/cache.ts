@@ -1,4 +1,4 @@
-import { LogLevel, NotionBackupLogger } from '@notion2all/utils'
+import { LogLevel, NotionBackupLogger, IndentLevel } from '@notion2all/utils'
 import { promises as fs } from 'fs'
 import path from 'path'
 import { PageObject } from '../types'
@@ -14,15 +14,7 @@ export class NotionCacheService {
 
   constructor(outputDir: string, config?: { logLevel?: LogLevel }) {
     this.cacheDir = path.join(outputDir, '.cache')
-    this.logLevel = config?.logLevel || LogLevel.level0
-  }
-
-  /**
-   * 设置日志级别
-   * @param level 日志级别
-   */
-  setLogLevel(level: LogLevel): void {
-    this.logLevel = level
+    this.logLevel = config?.logLevel || LogLevel.info
   }
 
   /**
@@ -32,20 +24,18 @@ export class NotionCacheService {
    * @param config.parentPageIds 父页面ID链
    * @returns 是否需要更新
    */
-  async shouldUpdate(
-    config: {
-      pageId: string;
-      lastEditedTime: string;
-      parentPageIds?: string[];
-    }
-  ): Promise<boolean> {
-    const { pageId, lastEditedTime, parentPageIds = [] } = config;
+  async shouldUpdate(config: {
+    pageId: string
+    lastEditedTime: string
+    parentPageIds?: string[]
+  }): Promise<boolean> {
+    const { pageId, lastEditedTime, parentPageIds = [] } = config
     try {
       const cachePath = this.getCachePath({ pageId, parentIds: parentPageIds })
       const cacheExists = await this.checkCacheExists(cachePath)
 
       if (!cacheExists) {
-        NotionBackupLogger.log(`[缓存] 页面 ${pageId} 没有缓存记录`, this.logLevel)
+        NotionBackupLogger.cacheLog(`[缓存] 页面 ${pageId} 没有缓存记录`)
         return true
       }
 
@@ -53,14 +43,14 @@ export class NotionCacheService {
       const needsUpdate = cacheData.last_edited_time !== lastEditedTime
 
       if (needsUpdate) {
-        NotionBackupLogger.log(`[缓存] 页面 ${pageId} 需要更新，最后编辑时间已变更`, this.logLevel)
+        NotionBackupLogger.cacheLog(`[缓存] 页面 ${pageId} 需要更新，最后编辑时间已变更`)
       } else {
-        NotionBackupLogger.log(`[缓存] 页面 ${pageId} 使用缓存，内容未变更`, this.logLevel)
+        NotionBackupLogger.cacheLog(`[缓存] 页面 ${pageId} 使用缓存，内容未变更`)
       }
 
       return needsUpdate
     } catch (error) {
-      NotionBackupLogger.error(pageId, error, this.logLevel)
+      NotionBackupLogger.error(pageId, error)
       return true
     }
   }
@@ -71,8 +61,11 @@ export class NotionCacheService {
    * @param config.parentPageIds 父页面ID链
    * @returns 缓存的页面数据，如果不存在则返回 null
    */
-  async getCachedData(config: { pageId: string; parentPageIds?: string[] }): Promise<PageObject | null> {
-    const { pageId, parentPageIds = [] } = config;
+  async getCachedData(config: {
+    pageId: string
+    parentPageIds?: string[]
+  }): Promise<PageObject | null> {
+    const { pageId, parentPageIds = [] } = config
     try {
       const formattedIds = parentPageIds.map(id => formatId(id))
       const formattedPageId = formatId(pageId)
@@ -86,16 +79,14 @@ export class NotionCacheService {
       const fileContent = await fs.readFile(filePath, 'utf-8')
       return JSON.parse(fileContent)
     } catch (error) {
-      NotionBackupLogger.log(`[缓存读取] 页面 ${pageId} 本地文件不存在或读取失败`, this.logLevel)
+      NotionBackupLogger.cacheLog(`[缓存读取] 页面 ${pageId} 本地文件不存在或读取失败`)
       return null
     }
   }
 
   private getCachePath(config: { pageId: string; parentIds?: string[] }): string {
-    const { pageId, parentIds = [] } = config;
-    const relativePath = parentIds.length > 0
-      ? path.join(...parentIds, pageId)
-      : pageId
+    const { pageId, parentIds = [] } = config
+    const relativePath = parentIds.length > 0 ? path.join(...parentIds, pageId) : pageId
     return path.join(this.cacheDir, `${relativePath}.json`)
   }
 
@@ -113,8 +104,8 @@ export class NotionCacheService {
       const content = await fs.readFile(cachePath, 'utf-8')
       return JSON.parse(content)
     } catch (error) {
-      NotionBackupLogger.error('cache', error, this.logLevel)
+      NotionBackupLogger.error('cache', error)
       throw error
     }
   }
-} 
+}
