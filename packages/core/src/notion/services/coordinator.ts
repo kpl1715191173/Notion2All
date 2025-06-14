@@ -87,12 +87,7 @@ export class NotionPageCoordinator {
     const { pageId, parentPageIds = [] } = options
 
     try {
-      // NotionBackupLogger.processStart(pageId, parentPageIds)
-      const indentLevel = Logger.getInstance().getLogLevel()
-      console.log('【调试】当前 indentSpacing:', Logger.getInstance().getIndentSpacing())
-      console.log('【调试】调用 processStart，缩进等级:', indentLevel)
       NotionBackupLogger.processStart(pageId, parentPageIds)
-      console.log('【调试】processStart 调用完成')
 
       // 1. 获取页面数据
       const pageData = await this.fetcher.fetchPageData({ pageId })
@@ -110,7 +105,6 @@ export class NotionPageCoordinator {
       }
 
       // 3. 获取完整数据
-      NotionBackupLogger.fetchData(pageId)
       const fullData = await this.fetcher.fetchFullPageData({ pageId })
 
       // 4. 保存数据

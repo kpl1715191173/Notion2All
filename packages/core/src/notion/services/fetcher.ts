@@ -42,7 +42,6 @@ export class NotionDataFetcher {
   async fetchBlockChildren(config: { blockId: string }): Promise<NotionBlock[]> {
     const { blockId } = config
     try {
-      NotionBackupLogger.fetchBlockChildren(blockId)
       const children = await this.notionApi.getBlockChildren({ blockId })
 
       if (!children || !Array.isArray(children)) {
@@ -50,10 +49,14 @@ export class NotionDataFetcher {
         return []
       }
 
-      return children.map(block => ({
+      const processedChildren = children.map(block => ({
         ...block,
         children: (block as any).has_children ? [] : undefined,
       })) as NotionBlock[]
+      
+      NotionBackupLogger.fetchBlockChildren(blockId, processedChildren.length)
+      
+      return processedChildren
     } catch (error) {
       NotionBackupLogger.error(blockId, error)
       throw error

@@ -52,9 +52,9 @@ export const backupCommand = (program: Command) => {
 
         // 设置全局日志级别
         const logLevel = config.logLevel as LogLevel
+        // 设置输出代码输出的层级
         const indentSpacing = 2
         configureLogging(logLevel, indentSpacing)
-        console.log(logLevel, indentSpacing)
 
         const summaryMsg = await createBox({
           title: 'Notion2All备份程序',

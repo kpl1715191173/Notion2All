@@ -35,7 +35,7 @@ export class NotionCacheService {
       const cacheExists = await this.checkCacheExists(cachePath)
 
       if (!cacheExists) {
-        NotionBackupLogger.cacheLog(`[缓存] 页面 ${pageId} 没有缓存记录`)
+        NotionBackupLogger.cacheLog(`[缓    存] 页面 ${pageId} 没有缓存记录`)
         return true
       }
 
@@ -43,9 +43,9 @@ export class NotionCacheService {
       const needsUpdate = cacheData.last_edited_time !== lastEditedTime
 
       if (needsUpdate) {
-        NotionBackupLogger.cacheLog(`[缓存] 页面 ${pageId} 需要更新，最后编辑时间已变更`)
+        NotionBackupLogger.cacheLog(`[缓    存] 页面 ${pageId} 需要更新，最后编辑时间已变更`)
       } else {
-        NotionBackupLogger.cacheLog(`[缓存] 页面 ${pageId} 使用缓存，内容未变更`)
+        NotionBackupLogger.cacheLog(`[缓    存] 页面 ${pageId} 使用缓存，内容未变更`)
       }
 
       return needsUpdate
