@@ -45,7 +45,7 @@ export class NotionDataFetcher {
       const children = await this.notionApi.getBlockChildren({ blockId })
 
       if (!children || !Array.isArray(children)) {
-        NotionBackupLogger.warning(`[警告] 块 ${blockId} 的子块数据格式不正确`)
+        NotionBackupLogger.warning(`[警    告] 块 ${blockId} 的子块数据格式不正确`)
         return []
       }
 

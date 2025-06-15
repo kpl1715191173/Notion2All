@@ -17,7 +17,6 @@ export class NotionPageCoordinator {
     recursive?: boolean
     includeImages?: boolean
     concurrency?: number
-    logLevel?: LogLevel
   }
   private logger?: NotionBackupLogger
 
@@ -36,7 +35,6 @@ export class NotionPageCoordinator {
       recursive: boolean
       includeImages: boolean
       concurrency: number
-      logLevel: LogLevel
     }
   }) {
     this.fetcher = options.fetcher
@@ -44,9 +42,7 @@ export class NotionPageCoordinator {
     this.saver = options.saver
     this.config = options.config || {}
 
-    this.fileDownloader = new NotionFileDownloader(this.saver.getOutputDir(), {
-      logLevel: this.config.logLevel,
-    })
+    this.fileDownloader = new NotionFileDownloader(this.saver.getOutputDir())
   }
 
   /**
@@ -126,9 +122,6 @@ export class NotionPageCoordinator {
           await this.fileDownloader.saveFiles({
             pageId,
             files: imageUrls,
-            options: {
-              // fileDownloader已经有了logLevel配置，无需重复传递
-            },
           })
         }
       }

@@ -31,7 +31,7 @@ function normalizeIndentLevel(level: IndentLevel | number): number {
 }
 
 // 默认缩进间隔
-const DEFAULT_INDENT_SPACING = 0
+const DEFAULT_INDENT_SPACING = 2
 
 type LogFunction = (message: string) => void
 
@@ -43,7 +43,9 @@ const createLogHandler = (
   indentSpacing: number = DEFAULT_INDENT_SPACING
 ): void => {
   const safeIndentLevel = normalizeIndentLevel(indentLevel)
-  const indent = ' '.repeat(safeIndentLevel * indentSpacing)
+  // 确保indentSpacing至少为2，以便有足够的缩进
+  const effectiveIndentSpacing = indentSpacing < 2 ? 2 : indentSpacing  
+  const indent = ' '.repeat(safeIndentLevel * effectiveIndentSpacing)
   const lines = message.split('\n')
   lines.forEach((line: string, index: number) => {
     const prefix = index === 0 ? icon : ' '.repeat(icon.length)

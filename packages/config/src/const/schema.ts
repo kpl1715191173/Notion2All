@@ -50,8 +50,9 @@ export const BackupConfigSchema = z.object({
   logDetails: z.boolean().default(false),
   /**
    * 显示日志的层级 - 默认 2
+   *
    */
-  logLevel: z.number().int().min(0).max(5).default(2)
+  logLevel: z.number().int().min(0).max(5).default(2),
 })
 
 // 认证配置

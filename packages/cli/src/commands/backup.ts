@@ -50,11 +50,11 @@ export const backupCommand = (program: Command) => {
         const configLoader = ConfigLoader.getInstance()
         const config = await configLoader.load()
 
-        // 设置全局日志级别
-        const logLevel = config.logLevel as LogLevel
-        // 设置输出代码输出的层级
-        const indentSpacing = 2
-        configureLogging(logLevel, indentSpacing)
+        configureLogging({
+          level: config.logLevel as LogLevel,
+          baseIndentLevel: IndentLevel.L2,
+          // indentSpacing: 2
+        })
 
         const summaryMsg = await createBox({
           title: 'Notion2All备份程序',
@@ -174,7 +174,6 @@ export const backupCommand = (program: Command) => {
                       config.includeAttachments === 'onlyPic' ||
                       config.includeAttachments === 'all',
                     concurrency: config.concurrency,
-                    logLevel: config.logLevel,
                   },
                 })
 
@@ -227,7 +226,6 @@ export const backupCommand = (program: Command) => {
                         config.includeAttachments === 'onlyPic' ||
                         config.includeAttachments === 'all',
                       concurrency: config.concurrency,
-                      logLevel: config.logLevel,
                     },
                   })
 

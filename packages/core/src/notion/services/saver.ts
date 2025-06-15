@@ -1,4 +1,4 @@
-import { LogLevel, NotionBackupLogger } from '@notion2all/utils'
+import { NotionBackupLogger } from '@notion2all/utils'
 import { promises as fs } from 'fs'
 import path from 'path'
 import { PageObject, SaveResult } from '../types'
@@ -9,21 +9,11 @@ import { formatId } from '../utils'
  * 负责将页面数据保存到本地文件系统
  */
 export class NotionPageSaver {
-  private logLevel: LogLevel
+  private baseIndentLevel: number = 2 // 默认缩进基准级别
 
-  constructor(
-    private outputDir: string,
-    config?: { logLevel?: LogLevel }
-  ) {
-    this.logLevel = config?.logLevel || LogLevel.info
-  }
-
-  /**
-   * 设置日志级别
-   * @param level 日志级别
-   */
-  setLogLevel(level: LogLevel): void {
-    this.logLevel = level
+  constructor(private outputDir: string) {
+    // 使用NotionBackupLogger的实例获取当前的缩进级别
+    this.baseIndentLevel = NotionBackupLogger.getNotionInstance().getBaseIndentLevel()
   }
 
   /**
@@ -55,7 +45,7 @@ export class NotionPageSaver {
 
       await this.ensureDirectoryExists(path.dirname(filePath))
 
-      NotionBackupLogger.log(`[保存] 保存页面 ${pageId} 到 ${filePath}`)
+      this.saveLog(`[保    存] 保存页面 ${pageId} 到 ${filePath}`)
       await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8')
 
       return {
@@ -63,7 +53,7 @@ export class NotionPageSaver {
         filePath,
       }
     } catch (error) {
-      NotionBackupLogger.error(pageId, error)
+      this.logError(pageId, error)
       return {
         success: false,
         error: error instanceof Error ? error.message : String(error),
@@ -81,8 +71,23 @@ export class NotionPageSaver {
     try {
       await fs.access(dirPath)
     } catch {
-      NotionBackupLogger.log(`[保存] 创建目录 ${dirPath}`)
+      this.saveLog(`[保    存] 创建目录 ${dirPath}`)
       await fs.mkdir(dirPath, { recursive: true })
     }
+  }
+
+  /**
+   * 保存相关日志输出，使用缩进控制
+   */
+  private saveLog(message: string): void {
+    // 类似于 cacheLog，使用专门的日志方法支持缩进
+    NotionBackupLogger.cacheLog(message)
+  }
+
+  /**
+   * 错误日志输出
+   */
+  private logError(pageId: string, error: any): void {
+    NotionBackupLogger.error(pageId, error)
   }
 }

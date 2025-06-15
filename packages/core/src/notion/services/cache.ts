@@ -1,4 +1,4 @@
-import { LogLevel, NotionBackupLogger, IndentLevel } from '@notion2all/utils'
+import { NotionBackupLogger, IndentLevel } from '@notion2all/utils'
 import { promises as fs } from 'fs'
 import path from 'path'
 import { PageObject } from '../types'
@@ -10,11 +10,9 @@ import { formatId } from '../utils'
  */
 export class NotionCacheService {
   private cacheDir: string
-  private logLevel: LogLevel
 
-  constructor(outputDir: string, config?: { logLevel?: LogLevel }) {
+  constructor(outputDir: string) {
     this.cacheDir = path.join(outputDir, '.cache')
-    this.logLevel = config?.logLevel || LogLevel.info
   }
 
   /**

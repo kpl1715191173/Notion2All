@@ -10,6 +10,7 @@ import { Logger, LogLevel, IndentLevel } from './base'
  */
 export class NotionBackupLogger extends Logger {
   private static notionInstance: NotionBackupLogger
+  private baseIndentLevel: IndentLevel = IndentLevel.L0
 
   private constructor() {
     super()
@@ -22,17 +23,24 @@ export class NotionBackupLogger extends Logger {
     return NotionBackupLogger.notionInstance
   }
 
-  // 重写 log 方法，自动获取全局缩进等级并支持微调
+  // 设置基础缩进等级
+  setBaseIndentLevel(level: IndentLevel): void {
+    this.baseIndentLevel = level
+  }
+
+  getBaseIndentLevel(): IndentLevel {
+    return this.baseIndentLevel
+  }
+
+  // 重写 log 方法，使用baseIndentLevel作为基准
   log(message: string, adjust: number = 0): void {
-    const baseIndent = Logger.getInstance().getLogLevel()
-    const indentLevel = baseIndent + adjust
+    const indentLevel = this.baseIndentLevel + adjust
     super.log(message, indentLevel)
   }
 
-  // 新增 cacheLog 方法，专用于缓存相关日志，自动获取全局缩进等级
+  // 新增 cacheLog 方法，使用baseIndentLevel作为基准
   cacheLog(message: string, adjust: number = 0): void {
-    const baseIndent = Logger.getInstance().getLogLevel()
-    const indentLevel = baseIndent + adjust
+    const indentLevel = this.baseIndentLevel + adjust
     super.log(message, indentLevel)
   }
 
@@ -73,15 +81,15 @@ export class NotionBackupLogger extends Logger {
     this.log(`[并发子页面] 页面 ${pageId} 的 ${count} 个子页面处理完成，耗时: ${time} ms`)
   }
   error(pageId: string, error: any): void {
-    const baseIndent = Logger.getInstance().getLogLevel()
+    const indentLevel = this.baseIndentLevel
     super.error(
       `[错误] 处理页面 ${pageId} 失败: ${error instanceof Error ? error.message : String(error)}`,
-      baseIndent
+      indentLevel
     )
   }
   warning(message: string): void {
-    const baseIndent = Logger.getInstance().getLogLevel()
-    super.warning(message, baseIndent)
+    const indentLevel = this.baseIndentLevel
+    super.warning(message, indentLevel)
   }
 
   // 静态方法提供便捷的日志访问
@@ -131,13 +139,23 @@ export class NotionBackupLogger extends Logger {
 
 /**
  * 配置全局日志系统
- * 使用此函数在应用程序启动时统一设置日志级别和缩进间隔
- * @param level 日志级别
- * @param indentSpacing 缩进间隔
+ * 使用此函数在应用程序启动时统一设置日志级别和缩进相关配置
+ * @param config 日志配置对象
+ * @param config.level 日志级别 - 控制显示哪些级别的日志（必需）
+ * @param config.baseIndentLevel 基础缩进等级 - 设置日志缩进的基准级别（必需）
+ * @param config.indentSpacing 缩进间隔 - 每级缩进的空格数量（可选）
  */
-export function configureLogging(level: LogLevel, indentSpacing?: number): void {
-  NotionBackupLogger.getNotionInstance().configureLogging(level, indentSpacing)
-  Logger.getInstance().configureLogging(level, indentSpacing)
+export function configureLogging(config: {
+  level: LogLevel;
+  baseIndentLevel: IndentLevel;
+  indentSpacing?: number;
+}): void {
+  // 设置日志级别和缩进间隔
+  NotionBackupLogger.getNotionInstance().configureLogging(config.level, config.indentSpacing)
+  Logger.getInstance().configureLogging(config.level, config.indentSpacing)
+  
+  // 设置基础缩进等级
+  NotionBackupLogger.getNotionInstance().setBaseIndentLevel(config.baseIndentLevel)
 }
 
 // 导出Notion备份日志实例
