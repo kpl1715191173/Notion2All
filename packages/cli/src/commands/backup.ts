@@ -178,7 +178,7 @@ export const backupCommand = (program: Command) => {
                 })
 
                 try {
-                  await coordinator.processPage({ pageId })
+                  await coordinator.processPage({ pageId, isRoot: true })
                   NotionBackupLogger.success(`页面 ${pageId} 备份完成`, IndentLevel.L1)
                 } catch (error) {
                   logger.error(
@@ -229,7 +229,7 @@ export const backupCommand = (program: Command) => {
                     },
                   })
 
-                  await coordinator.processPage({ pageId })
+                  await coordinator.processPage({ pageId, isRoot: true })
                   NotionBackupLogger.success(`页面 ${pageId} 备份完成`, IndentLevel.L1)
                 } catch (error) {
                   logger.error(

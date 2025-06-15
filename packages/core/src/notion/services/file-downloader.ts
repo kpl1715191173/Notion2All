@@ -197,6 +197,7 @@ export class NotionFileDownloader {
    * @param config.blockId 文件块ID
    * @param config.fileUrl 文件URL
    * @param config.options 下载选项
+   * @param config.parentPageIds 父页面ID链
    * @returns 保存结果
    */
   async saveFile(config: {
@@ -204,16 +205,18 @@ export class NotionFileDownloader {
     blockId: string
     fileUrl: string
     options?: DownloadOptions
+    parentPageIds?: string[]
   }): Promise<SaveResult> {
-    const { pageId, blockId, fileUrl, options = {} } = config
+    const { pageId, blockId, fileUrl, options = {}, parentPageIds = [] } = config
 
     try {
       // 生成文件名
       const fileName = this.generateFileName(blockId, fileUrl)
 
-      // 创建文件目录
+      // 创建文件目录，考虑父页面ID链
+      const formattedParentIds = parentPageIds.map(id => formatId(id))
       const formattedPageId = formatId(pageId)
-      const fileDir = path.join(this.outputDir, formattedPageId, 'assets')
+      const fileDir = path.join(this.outputDir, ...formattedParentIds, formattedPageId, 'assets')
       await this.ensureDir(fileDir)
 
       // 文件保存路径
@@ -254,13 +257,15 @@ export class NotionFileDownloader {
    * 批量保存文件
    * @param config.pageId 页面ID
    * @param config.files 文件信息数组
+   * @param config.parentPageIds 父页面ID链
    * @returns 保存结果数组
    */
   async saveFiles(config: {
     pageId: string
     files: Array<{ blockId: string; url: string }>
+    parentPageIds?: string[]
   }): Promise<SaveResult[]> {
-    const { pageId, files } = config
+    const { pageId, files, parentPageIds = [] } = config
     const results: SaveResult[] = []
 
     this.logInfo(`[批量下载] 开始下载页面 ${pageId} 的 ${files.length} 个文件`)
@@ -274,6 +279,7 @@ export class NotionFileDownloader {
         blockId,
         fileUrl: url,
         options: {},
+        parentPageIds,
       })
 
       results.push(result)
