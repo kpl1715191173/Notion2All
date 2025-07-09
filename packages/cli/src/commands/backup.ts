@@ -40,6 +40,8 @@ export const backupCommand = (program: Command) => {
     .option('--no-recursive', 'Do not recursively backup child pages')
     .option('-l, --log-recursive', '是否记录递归过程')
     .option('-c, --concurrency <number>', '并发处理页面的数量 (0表示串行处理)')
+    .option('--cache', '启用缓存功能（默认）')
+    .option('--no-cache', '禁用缓存功能，每次都重新下载页面数据')
     // .option('--log-level <level>', '日志级别 (0-4)')
     .action(async options => {
       try {
@@ -92,6 +94,10 @@ export const backupCommand = (program: Command) => {
         if (options.concurrency) {
           config.concurrency = parseInt(options.concurrency, 10)
         }
+        // 处理缓存选项
+        if (options.cache !== undefined) {
+          config.enableCache = options.cache
+        }
 
         NotionBackupLogger.log(`📁 配置文件路径: ${configLoader.getConfigPath()}`, IndentLevel.L1)
 
@@ -107,6 +113,7 @@ export const backupCommand = (program: Command) => {
             ` 📎 附件处理: ${config.includeAttachments}`,
             ` 🔄 递归备份: ${config.recursive ? '是' : '否'}`,
             ` 🚀 并发数量: ${config.concurrency}${config.concurrency === 0 ? ' (串行处理)' : ''}`,
+            ` 💾 启用缓存: ${config.enableCache ? '是' : '否'}`,
             '',
             '📶 Log输出配置:',
             logConfig.length > 0 ? logConfig.join('\n') : ' 无',
@@ -174,6 +181,7 @@ export const backupCommand = (program: Command) => {
                       config.includeAttachments === 'onlyPic' ||
                       config.includeAttachments === 'all',
                     concurrency: config.concurrency,
+                    enableCache: config.enableCache,
                   },
                 })
 
@@ -226,6 +234,7 @@ export const backupCommand = (program: Command) => {
                         config.includeAttachments === 'onlyPic' ||
                         config.includeAttachments === 'all',
                       concurrency: config.concurrency,
+                      enableCache: config.enableCache,
                     },
                   })
 

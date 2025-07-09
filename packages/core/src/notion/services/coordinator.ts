@@ -17,6 +17,7 @@ export class NotionPageCoordinator {
     recursive?: boolean
     includeImages?: boolean
     concurrency?: number
+    enableCache?: boolean
   }
   private logger?: NotionBackupLogger
   // 资源映射表，记录每个资源ID对应的原始页面ID
@@ -37,6 +38,7 @@ export class NotionPageCoordinator {
       recursive: boolean
       includeImages: boolean
       concurrency: number
+      enableCache?: boolean
     }
   }) {
     this.fetcher = options.fetcher
@@ -128,6 +130,9 @@ export class NotionPageCoordinator {
   }): Promise<void> {
     const { pageId, parentPageIds = [], isRoot = false } = options
 
+    // 检查是否启用了缓存功能
+    const enableCache = this.config.enableCache !== undefined ? this.config.enableCache : true
+
     try {
       NotionBackupLogger.processStart(pageId, parentPageIds)
 
@@ -135,11 +140,16 @@ export class NotionPageCoordinator {
       const pageData = await this.fetcher.fetchPageData({ pageId })
 
       // 2. 检查缓存
-      const needsUpdate = await this.cacheService.shouldUpdate({
-        pageId,
-        lastEditedTime: pageData.last_edited_time,
-        parentPageIds,
-      })
+      let needsUpdate = true
+      if (enableCache) {
+        needsUpdate = await this.cacheService.shouldUpdate({
+          pageId,
+          lastEditedTime: pageData.last_edited_time,
+          parentPageIds,
+        })
+      } else {
+        NotionBackupLogger.cacheLog(`[缓    存] 页面 ${pageId} 缓存功能已禁用，将重新下载`)
+      }
 
       if (!needsUpdate) {
         NotionBackupLogger.useCache(pageId)
@@ -167,7 +177,16 @@ export class NotionPageCoordinator {
         throw new Error(`保存页面 ${pageId} 失败: ${saveResult.error}`)
       }
 
-      // 5. 下载图片（如果配置允许）
+      // 5. 更新缓存记录
+      if (enableCache) {
+        await this.cacheService.updateCache({
+          pageId,
+          data: fullData,
+          parentPageIds,
+        })
+      }
+
+      // 6. 下载图片（如果配置允许）
       if (this.config.includeImages) {
         // 提取属于当前页面的图片
         const imageUrls = this.extractImageUrls(fullData.children, pageId)
@@ -181,7 +200,7 @@ export class NotionPageCoordinator {
         }
       }
 
-      // 6. 处理子页面
+      // 7. 处理子页面
       if (this.config.recursive) {
         const childPages = fullData.children.filter(block => isChildPage(block))
         if (childPages.length > 0) {
