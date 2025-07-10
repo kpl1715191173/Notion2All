@@ -44,15 +44,20 @@ export const BackupConfigSchema = z.object({
    * 0 表示不使用并发处理
    */
   concurrency: z.number().int().min(0).default(5),
+
+  // ============ 日志配置项 ============
   /**
    * 是否显示详细版的日志信息 - 默认 false
    */
   logDetails: z.boolean().default(false),
   /**
    * 显示日志的层级 - 默认 2
-   *
    */
   logLevel: z.number().int().min(0).max(5).default(2),
+  /**
+   * Notion API 的输出层次 - 默认 'error' 报错才会输出日志
+   */
+  logNotionLevel: z.enum(['debug', 'info', 'warn', 'error']).default('error'),
 })
 
 // 认证配置

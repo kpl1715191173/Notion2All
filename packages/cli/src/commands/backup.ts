@@ -142,7 +142,7 @@ export const backupCommand = (program: Command) => {
         const notionApi = createNotionApi({
           auth: apiKeyInfo?.key!,
           timeoutMs: 30000,
-          logLevel: 'debug' as any, // 增加日志级别，方便排查问题
+          logLevel: config.logNotionLevel as any,
         })
 
         if (notionApi) {
