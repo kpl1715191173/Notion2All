@@ -32,30 +32,53 @@ export class NotionApi {
   }
 
   async getPage(options: { pageId: string }): Promise<PageObjectResponse> {
-    const { pageId } = options;
-    return this.client.pages.retrieve({ page_id: pageId }) as Promise<PageObjectResponse>
+    const { pageId } = options
+    try {
+      const response = await this.client.pages.retrieve({
+        page_id: pageId,
+      })
+      return response as unknown as PageObjectResponse
+    } catch (error) {
+      console.error(`获取页面 ${pageId} 失败:`, error)
+      throw error
+    }
   }
 
   async getDatabase(options: { databaseId: string }): Promise<DatabaseObjectResponse> {
-    const { databaseId } = options;
-    return this.client.databases.retrieve({
-      database_id: databaseId,
-    }) as Promise<DatabaseObjectResponse>
+    const { databaseId } = options
+    try {
+      return (await this.client.databases.retrieve({
+        database_id: databaseId,
+      })) as unknown as Promise<DatabaseObjectResponse>
+    } catch (error) {
+      console.error(`获取数据库 ${databaseId} 失败:`, error)
+      throw error
+    }
   }
 
   async queryDatabase(options: { databaseId: string }) {
-    const { databaseId } = options;
-    return this.client.databases.query({
-      database_id: databaseId,
-    })
+    const { databaseId } = options
+    try {
+      return await this.client.databases.query({
+        database_id: databaseId,
+      })
+    } catch (error) {
+      console.error(`查询数据库 ${databaseId} 失败:`, error)
+      throw error
+    }
   }
 
   async getBlockChildren(options: { blockId: string }) {
-    const { blockId } = options;
-    const response = await this.client.blocks.children.list({
-      block_id: blockId,
-    })
-    return response.results
+    const { blockId } = options
+    try {
+      const response = await this.client.blocks.children.list({
+        block_id: blockId,
+      })
+      return response.results
+    } catch (error) {
+      console.error(`获取块 ${blockId} 的子块失败:`, error)
+      throw error
+    }
   }
 }
 
