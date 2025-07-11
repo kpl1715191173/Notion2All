@@ -5,11 +5,13 @@ import type {
   PageObjectResponse,
   DatabaseObjectResponse,
 } from '@notionhq/client/build/src/api-endpoints'
+import { createProxyAgent } from '@notion2all/utils'
 
 export interface NotionApiConfig {
   auth: string
   logLevel?: LogLevel
   timeoutMs?: number
+  proxyUrl?: string
 }
 
 export class NotionApi {
@@ -26,6 +28,14 @@ export class NotionApi {
 
     if (config.timeoutMs) {
       clientOptions.timeoutMs = config.timeoutMs
+    }
+
+    // 添加代理支持
+    if (config.proxyUrl) {
+      const proxyAgent = createProxyAgent({ proxyUrl: config.proxyUrl })
+      if (proxyAgent) {
+        clientOptions.agent = proxyAgent
+      }
     }
 
     this.client = new Client(clientOptions)
@@ -83,5 +93,7 @@ export class NotionApi {
 }
 
 export function createNotionApi(config: NotionApiConfig): NotionApi {
-  return new NotionApi(config)
+  const i = new NotionApi(config)
+  console.log(i)
+  return i
 }

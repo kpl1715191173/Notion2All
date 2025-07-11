@@ -13,8 +13,11 @@ import {
   configureLogging,
   logger,
   IndentLevel,
+  isValidProxyUrl,
+  testProxyConnectivity,
 } from '@notion2all/utils'
 import { createBox } from '../utils'
+import type { LogLevel as NotionLogLevel } from '@notionhq/client'
 
 // 计时器工具函数
 const timer = {
@@ -42,7 +45,7 @@ export const backupCommand = (program: Command) => {
     .option('-c, --concurrency <number>', '并发处理页面的数量 (0表示串行处理)')
     .option('--cache', '启用缓存功能（默认）')
     .option('--no-cache', '禁用缓存功能，每次都重新下载页面数据')
-    // .option('--log-level <level>', '日志级别 (0-4)')
+    .option('--test-proxy', '测试代理连接是否有效')
     .action(async options => {
       try {
         /**
@@ -114,6 +117,7 @@ export const backupCommand = (program: Command) => {
             ` 🔄 递归备份: ${config.recursive ? '是' : '否'}`,
             ` 🚀 并发数量: ${config.concurrency}${config.concurrency === 0 ? ' (串行处理)' : ''}`,
             ` 💾 启用缓存: ${config.enableCache ? '是' : '否'}`,
+            config.proxyUrl ? ` 🔌 代理服务器: ${config.proxyUrl}` : '',
             '',
             '📶 Log输出配置:',
             logConfig.length > 0 ? logConfig.join('\n') : ' 无',
@@ -139,11 +143,25 @@ export const backupCommand = (program: Command) => {
           IndentLevel.L0
         )
 
-        const notionApi = createNotionApi({
+        // 创建Notion API配置
+        const notionApiCfg: {
+          auth: string
+          timeoutMs: number
+          logLevel: NotionLogLevel
+          proxyUrl?: string
+        } = {
           auth: apiKeyInfo?.key!,
           timeoutMs: 30000,
-          logLevel: config.logNotionLevel as any,
-        })
+          logLevel: config.logNotionLevel as NotionLogLevel,
+        }
+
+        // 如果指定了代理，添加代理配置
+        if (config.proxyUrl && isValidProxyUrl(config.proxyUrl)) {
+          notionApiCfg.proxyUrl = config.proxyUrl
+          NotionBackupLogger.log(`使用代理服务器: ${config.proxyUrl}`, IndentLevel.L1)
+        }
+
+        const notionApi = createNotionApi(notionApiCfg)
 
         if (notionApi) {
           NotionBackupLogger.success('Notion SDK初始化成功', IndentLevel.L1)

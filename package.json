@@ -9,6 +9,7 @@
     "postinstall": "pnpm link --global",
     "set:config": "ts-node -r tsconfig-paths/register packages/cli/src/index.ts config",
     "dev:backup": "ts-node -r tsconfig-paths/register packages/cli/src/index.ts backup",
+    "dev:test-proxy": "ts-node -r tsconfig-paths/register packages/cli/src/index.ts test-proxy",
     "build": "tsc && tsup cli.ts --format cjs --dts",
     "lint": "pnpm -r lint",
     "test": "echo \"Error: no test specified\" && exit 1"

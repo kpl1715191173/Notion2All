@@ -1,4 +1,3 @@
-import { LogLevel } from '@notionhq/client'
 import { z } from 'zod'
 
 // 页面配置 schema
@@ -44,6 +43,10 @@ export const BackupConfigSchema = z.object({
    * 0 表示不使用并发处理
    */
   concurrency: z.number().int().min(0).default(5),
+  /**
+   * 设置本地代理url
+   */
+  proxyUrl: z.string().optional(),
 
   // ============ 日志配置项 ============
   /**

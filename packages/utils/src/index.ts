@@ -2,4 +2,7 @@
 export * from './log'
 
 // 导出格式化工具
-export * from './format' 
+export * from './format'
+
+// 导出代理工具
+export * from './proxy'
