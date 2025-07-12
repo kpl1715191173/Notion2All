@@ -45,6 +45,8 @@ export const BackupConfigSchema = z.object({
   concurrency: z.number().int().min(0).default(5),
   /**
    * 设置本地代理url
+   * 通常使用开启的代理服务的混合端口，或者使用fiddler进行抓包
+   * E.g. http://127.0.0.1:8866
    */
   proxyUrl: z.string().optional(),
 

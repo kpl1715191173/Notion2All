@@ -6,6 +6,7 @@ import {
   NotionDataFetcher,
   NotionPageCoordinator,
   NotionPageSaver,
+  type LogLevel as NotionLogLevel,
 } from '@notion2all/core'
 import {
   NotionBackupLogger,
@@ -17,7 +18,6 @@ import {
   testProxyConnectivity,
 } from '@notion2all/utils'
 import { createBox } from '../utils'
-import type { LogLevel as NotionLogLevel } from '@notionhq/client'
 
 // 计时器工具函数
 const timer = {

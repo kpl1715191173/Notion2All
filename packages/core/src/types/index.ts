@@ -73,3 +73,5 @@ export interface NoteMetadata {
   /** 原始URL */
   originalUrl?: string;
 } 
+
+export * from './notionApi'

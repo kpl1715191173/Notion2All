@@ -1,11 +1,12 @@
 import { Client } from '@notionhq/client'
+import { createProxyAgent } from '@notion2all/utils'
+
 import type { LogLevel } from '@notionhq/client'
 import type { ClientOptions } from '@notionhq/client/build/src/Client'
 import type {
   PageObjectResponse,
   DatabaseObjectResponse,
 } from '@notionhq/client/build/src/api-endpoints'
-import { createProxyAgent } from '@notion2all/utils'
 
 export interface NotionApiConfig {
   auth: string
@@ -93,7 +94,5 @@ export class NotionApi {
 }
 
 export function createNotionApi(config: NotionApiConfig): NotionApi {
-  const i = new NotionApi(config)
-  console.log(i)
-  return i
+  return new NotionApi(config)
 }
