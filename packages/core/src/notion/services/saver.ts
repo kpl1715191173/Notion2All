@@ -1,8 +1,9 @@
 import { NotionBackupLogger } from '@notion2all/utils'
 import { promises as fs } from 'fs'
 import path from 'path'
-import { PageObject, SaveResult } from '../types'
+import { PageObject, SaveResult, NotionBlock } from '../types'
 import { formatId } from '../utils'
+import { isChildPage } from '@notion2all/utils'
 
 /**
  * Notion 页面数据保存器
@@ -45,8 +46,11 @@ export class NotionPageSaver {
 
       await this.ensureDirectoryExists(path.dirname(filePath))
 
+      // 创建数据的深拷贝，避免修改原始数据
+      const saveData = this.prepareDataForSaving(JSON.parse(JSON.stringify(data)));
+
       this.saveLog(`[保    存] 保存页面 ${pageId} 到 ${filePath}`)
-      await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8')
+      await fs.writeFile(filePath, JSON.stringify(saveData, null, 2), 'utf-8')
 
       return {
         success: true,
@@ -59,6 +63,50 @@ export class NotionPageSaver {
         error: error instanceof Error ? error.message : String(error),
       }
     }
+  }
+
+  /**
+   * 准备要保存的数据，移除子页面的详细内容以避免重复
+   * @param data 原始页面数据
+   * @returns 处理后的页面数据
+   */
+  private prepareDataForSaving(data: PageObject): PageObject {
+    if (!data.children || !Array.isArray(data.children)) {
+      return data;
+    }
+
+    // 递归处理所有块，移除子页面的详细内容
+    data.children = this.processBlocksForSaving(data.children);
+    
+    return data;
+  }
+
+  /**
+   * 递归处理块列表，移除子页面的详细内容
+   * @param blocks 块列表
+   * @returns 处理后的块列表
+   */
+  private processBlocksForSaving(blocks: NotionBlock[]): NotionBlock[] {
+    return blocks.map(block => {
+      // 如果是子页面，移除其children属性
+      if (isChildPage(block)) {
+        // 创建块的浅拷贝，然后删除children属性
+        const { children, ...blockWithoutChildren } = block;
+        // 保留对子页面的引用，但不包含详细内容
+        return blockWithoutChildren as NotionBlock;
+      }
+      
+      // 对于非子页面块，如果有子块，递归处理
+      if (block.children && Array.isArray(block.children)) {
+        return {
+          ...block,
+          children: this.processBlocksForSaving(block.children)
+        };
+      }
+      
+      // 其他情况直接返回原块
+      return block;
+    });
   }
 
   private getSavePath(config: { pageId: string; parentIds?: string[] }): string {

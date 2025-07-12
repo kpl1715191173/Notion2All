@@ -3,6 +3,7 @@ import { NotionCacheService } from './cache'
 import { NotionPageSaver } from './saver'
 import { NotionFileDownloader } from './file-downloader'
 import { isChildPage, logger, LogLevel, NotionBackupLogger, Logger } from '@notion2all/utils'
+import { NotionBlock, PageObject } from '../types'
 
 /**
  * Notion 页面协调器
@@ -200,50 +201,107 @@ export class NotionPageCoordinator {
         }
       }
 
-      // 7. 处理子页面
+      // 7. 处理子页面（包括直接子页面和嵌套在普通块中的子页面）
       if (this.config.recursive) {
-        const childPages = fullData.children.filter(block => isChildPage(block))
-        if (childPages.length > 0) {
-          NotionBackupLogger.childPages(pageId, childPages.length)
-
-          if (!this.config.concurrency || this.config.concurrency <= 0) {
-            // 串行处理
-            const startTime = process.hrtime.bigint()
-            for (const childPage of childPages) {
-              await this.processPage({
-                pageId: childPage.id,
-                parentPageIds: [...parentPageIds, pageId],
-                isRoot: false
-              })
-            }
-            const timeUsed = (Number(process.hrtime.bigint() - startTime) / 1_000_000).toFixed(2)
-            NotionBackupLogger.serialComplete(pageId, childPages.length, timeUsed)
-          } else {
-            // 并发处理
-            NotionBackupLogger.concurrentProcess(this.config.concurrency, childPages.length)
-            const startTime = process.hrtime.bigint()
-
-            // 分批处理子页面
-            for (let i = 0; i < childPages.length; i += this.config.concurrency) {
-              const batch = childPages.slice(i, i + this.config.concurrency)
-              const promises = batch.map(childPage =>
-                this.processPage({
-                  pageId: childPage.id,
-                  parentPageIds: [...parentPageIds, pageId],
-                  isRoot: false
-                })
-              )
-              await Promise.all(promises)
-            }
-
-            const timeUsed = (Number(process.hrtime.bigint() - startTime) / 1_000_000).toFixed(2)
-            NotionBackupLogger.concurrentComplete(pageId, childPages.length, timeUsed)
-          }
-        }
+        await this.processChildPages(fullData, pageId, parentPageIds);
       }
     } catch (error) {
       NotionBackupLogger.error(pageId, error)
       throw error
+    }
+  }
+
+  /**
+   * 处理所有子页面，包括直接子页面和嵌套在块中的子页面
+   * @param data 页面数据
+   * @param parentId 父页面ID
+   * @param ancestorIds 祖先页面ID链
+   */
+  private async processChildPages(data: PageObject, parentId: string, ancestorIds: string[] = []): Promise<void> {
+    if (!data.children || !Array.isArray(data.children)) {
+      return;
+    }
+
+    // 先处理直接的子页面
+    const directChildPages = data.children.filter((block: NotionBlock) => isChildPage(block));
+    if (directChildPages.length > 0) {
+      NotionBackupLogger.childPages(parentId, directChildPages.length);
+
+      if (!this.config.concurrency || this.config.concurrency <= 0) {
+        // 串行处理
+        const startTime = process.hrtime.bigint();
+        for (const childPage of directChildPages) {
+          await this.processPage({
+            pageId: childPage.id,
+            parentPageIds: [...ancestorIds, parentId],
+            isRoot: false
+          });
+        }
+        const timeUsed = (Number(process.hrtime.bigint() - startTime) / 1_000_000).toFixed(2);
+        NotionBackupLogger.serialComplete(parentId, directChildPages.length, timeUsed);
+      } else {
+        // 并发处理
+        NotionBackupLogger.concurrentProcess(this.config.concurrency, directChildPages.length);
+        const startTime = process.hrtime.bigint();
+
+        // 分批处理子页面
+        for (let i = 0; i < directChildPages.length; i += this.config.concurrency) {
+          const batch = directChildPages.slice(i, i + this.config.concurrency);
+          const promises = batch.map((childPage: NotionBlock) =>
+            this.processPage({
+              pageId: childPage.id,
+              parentPageIds: [...ancestorIds, parentId],
+              isRoot: false
+            })
+          );
+          await Promise.all(promises);
+        }
+
+        const timeUsed = (Number(process.hrtime.bigint() - startTime) / 1_000_000).toFixed(2);
+        NotionBackupLogger.concurrentComplete(parentId, directChildPages.length, timeUsed);
+      }
+    }
+
+    // 递归处理嵌套在普通块中的子页面
+    await this.processNestedChildPages(data.children, parentId, ancestorIds);
+  }
+
+  /**
+   * 递归处理所有嵌套在普通块中的子页面
+   * @param blocks 块列表
+   * @param parentId 父页面ID
+   * @param ancestorIds 祖先页面ID链
+   */
+  private async processNestedChildPages(blocks: NotionBlock[], parentId: string, ancestorIds: string[] = []): Promise<void> {
+    for (const block of blocks) {
+      // 跳过子页面块，它们已经在processChildPages中处理过了
+      if (isChildPage(block)) {
+        continue;
+      }
+      
+      // 处理嵌套块
+      if (block.children && Array.isArray(block.children)) {
+        // 查找此块中的子页面
+        const nestedChildPages = block.children.filter((child: NotionBlock) => isChildPage(child));
+        if (nestedChildPages.length > 0) {
+          NotionBackupLogger.log(
+            `[嵌套页面] 在块 ${block.id} 中发现 ${nestedChildPages.length} 个嵌套子页面`,
+            0
+          );
+          
+          // 处理这些嵌套子页面
+          for (const childPage of nestedChildPages) {
+            await this.processPage({
+              pageId: childPage.id,
+              parentPageIds: [...ancestorIds, parentId],
+              isRoot: false
+            });
+          }
+        }
+        
+        // 继续递归处理更深层的块
+        await this.processNestedChildPages(block.children, parentId, ancestorIds);
+      }
     }
   }
 }

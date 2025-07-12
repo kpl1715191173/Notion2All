@@ -41,7 +41,7 @@ export const timer = {
  * @returns 是否是子页面
  */
 export function isChildPage(block: NotionBlock): boolean {
-  return block?.type === 'child_page'
+  return 'child_page' in block
 }
 
 /**
