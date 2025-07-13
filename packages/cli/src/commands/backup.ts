@@ -172,7 +172,7 @@ export const backupCommand = (program: Command) => {
 
           // 创建共享服务实例
           const fetcher = new NotionDataFetcher(notionApi)
-          const cacheService = new NotionCacheService(config.outputDir)
+          const cacheService = new NotionCacheService(config.outputDir, fetcher)
           const saver = new NotionPageSaver(config.outputDir)
 
           // 根页面并发处理

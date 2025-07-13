@@ -1,6 +1,6 @@
 import { NotionApi } from '../api'
 import { NotionBlock, PageObject } from '../types'
-import { LogLevel, NotionBackupLogger } from '@notion2all/utils'
+import { formatId, LogLevel, NotionBackupLogger } from '@notion2all/utils'
 
 /**
  * Notion 数据获取器
@@ -23,7 +23,7 @@ export class NotionDataFetcher {
   async fetchPageData(config: { pageId: string }): Promise<PageObject> {
     const { pageId } = config
     try {
-      NotionBackupLogger.fetchData(pageId)
+      NotionBackupLogger.fetchPageData(formatId(pageId))
       const pageData = await this.notionApi.getPage({ pageId })
       return {
         ...pageData,

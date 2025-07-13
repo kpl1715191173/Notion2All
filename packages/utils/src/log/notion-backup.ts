@@ -53,8 +53,8 @@ export class NotionBackupLogger extends Logger {
   useCache(pageId: string): void {
     this.log(`[使用缓存] 页面 ${pageId} 使用本地缓存`)
   }
-  fetchData(pageId: string): void {
-    this.log(`[网络请求] 页面 ${pageId} 需要更新，获取完整内容`)
+  fetchPageData(pageId: string): void {
+    this.log(`[网络请求] 页面 ${pageId} 信息`)
   }
   fetchBlock(blockId: string): void {
     this.log(`[网络请求] 获取块 ${blockId} 的子块列表`)
@@ -99,8 +99,8 @@ export class NotionBackupLogger extends Logger {
   static useCache(pageId: string): void {
     NotionBackupLogger.getNotionInstance().useCache(pageId)
   }
-  static fetchData(pageId: string): void {
-    NotionBackupLogger.getNotionInstance().fetchData(pageId)
+  static fetchPageData(pageId: string): void {
+    NotionBackupLogger.getNotionInstance().fetchPageData(pageId)
   }
   static fetchBlock(blockId: string): void {
     NotionBackupLogger.getNotionInstance().fetchBlock(blockId)
@@ -146,14 +146,14 @@ export class NotionBackupLogger extends Logger {
  * @param config.indentSpacing 缩进间隔 - 每级缩进的空格数量（可选）
  */
 export function configureLogging(config: {
-  level: LogLevel;
-  baseIndentLevel: IndentLevel;
-  indentSpacing?: number;
+  level: LogLevel
+  baseIndentLevel: IndentLevel
+  indentSpacing?: number
 }): void {
   // 设置日志级别和缩进间隔
   NotionBackupLogger.getNotionInstance().configureLogging(config.level, config.indentSpacing)
   Logger.getInstance().configureLogging(config.level, config.indentSpacing)
-  
+
   // 设置基础缩进等级
   NotionBackupLogger.getNotionInstance().setBaseIndentLevel(config.baseIndentLevel)
 }

@@ -1,9 +1,9 @@
+import { NotionBackupLogger, isChildPage } from '@notion2all/utils'
+import { NotionBlock, PageObject } from '../types'
 import { NotionDataFetcher } from './fetcher'
-import { NotionCacheService } from './cache'
 import { NotionPageSaver } from './saver'
 import { NotionFileDownloader } from './file-downloader'
-import { isChildPage, logger, LogLevel, NotionBackupLogger, Logger } from '@notion2all/utils'
-import { NotionBlock, PageObject } from '../types'
+import { NotionCacheService } from './cache'
 
 /**
  * Notion 页面协调器
@@ -152,6 +152,31 @@ export class NotionPageCoordinator {
         NotionBackupLogger.cacheLog(`[缓    存] 页面 ${pageId} 缓存功能已禁用，将重新下载`)
       }
 
+      // 检查是否有需要更新的子页面，即使父页面本身不需要更新
+      const updatedChildPageIds = needsUpdate ? [] : this.cacheService.getUpdatedChildPages(pageId)
+      
+      if (!needsUpdate && updatedChildPageIds.length === 0) {
+        NotionBackupLogger.useCache(pageId)
+        return
+      } else if (!needsUpdate && updatedChildPageIds.length > 0) {
+        NotionBackupLogger.cacheLog(`[增量更新] 页面 ${pageId} 本身使用缓存，但有 ${updatedChildPageIds.length} 个子页面需要更新`)
+        
+        // 只获取缓存的父页面数据，不重新下载
+        const cachedPageData = await this.cacheService.getCachedData({ pageId, parentPageIds })
+        
+        if (!cachedPageData) {
+          NotionBackupLogger.error(pageId, `无法获取缓存的页面数据，将完整重新下载`)
+          needsUpdate = true // 回退到完整更新
+        } else {
+          // 单独处理每个需要更新的子页面
+          await this.processUpdatedChildPages(cachedPageData, pageId, parentPageIds, updatedChildPageIds)
+          
+          // 清除已处理的子页面记录
+          this.cacheService.clearUpdatedChildPages(pageId)
+          return
+        }
+      }
+
       if (!needsUpdate) {
         NotionBackupLogger.useCache(pageId)
         return
@@ -210,60 +235,177 @@ export class NotionPageCoordinator {
       throw error
     }
   }
+  
+  /**
+   * 处理需要更新的子页面
+   * 这个方法用于处理父页面不需要更新，但有子页面需要更新的情况
+   */
+  private async processUpdatedChildPages(
+    parentPageData: PageObject,
+    parentId: string,
+    parentPageIds: string[],
+    updatedChildIds: string[]
+  ): Promise<void> {
+    if (!parentPageData || !parentPageData.children || !updatedChildIds || updatedChildIds.length === 0) {
+      return
+    }
+    
+    NotionBackupLogger.cacheLog(`[子页面更新] 开始处理 ${parentId} 下的 ${updatedChildIds.length} 个子页面`)
+    
+    // 构建新的父页面链
+    const newParentChain = [...parentPageIds, parentId]
+    
+    // 直接处理每个需要更新的子页面
+    for (const childId of updatedChildIds) {
+      await this.processPage({
+        pageId: childId,
+        parentPageIds: newParentChain,
+        isRoot: false
+      })
+    }
+    
+    NotionBackupLogger.cacheLog(`[子页面更新] 完成处理 ${parentId} 下的所有需要更新的子页面`)
+  }
 
   /**
-   * 处理所有子页面，包括直接子页面和嵌套在块中的子页面
-   * @param data 页面数据
-   * @param parentId 父页面ID
-   * @param ancestorIds 祖先页面ID链
+   * 批量处理多个页面及其子页面
+   * 使用优化的缓存检查策略
+   * @param pageIds 要处理的页面ID数组
+   * @param options 配置选项
    */
-  private async processChildPages(data: PageObject, parentId: string, ancestorIds: string[] = []): Promise<void> {
-    if (!data.children || !Array.isArray(data.children)) {
-      return;
+  async batchProcessPages(
+    pageIds: string[], 
+    options: { 
+      concurrency?: number,
+      parentPageIds?: string[] 
+    } = {}
+  ): Promise<void> {
+    const { concurrency = 3, parentPageIds = [] } = options
+    const enableCache = this.config.enableCache !== undefined ? this.config.enableCache : true
+    
+    try {
+      NotionBackupLogger.cacheLog(`[批量处理] 开始处理 ${pageIds.length} 个页面`)
+      
+      if (pageIds.length === 0) return;
+      
+      // 步骤1: 获取所有页面的基本信息用于缓存检查
+      const pageInfoPromises = pageIds.map(pageId => 
+        this.fetcher.fetchPageData({ pageId })
+          .then(data => ({
+            pageId,
+            lastEditedTime: data.last_edited_time,
+            parentPageIds
+          }))
+          .catch(error => {
+            NotionBackupLogger.error(pageId, `获取页面基本信息失败: ${error}`)
+            return null
+          })
+      );
+      
+      const pageInfos = (await Promise.all(pageInfoPromises)).filter(Boolean) as Array<{
+        pageId: string;
+        lastEditedTime: string;
+        parentPageIds: string[];
+      }>;
+      
+      // 步骤2: 批量检查哪些页面需要更新
+      let pagesToProcess = pageIds;
+      if (enableCache && pageInfos.length > 0) {
+        const needsUpdateIds = await this.cacheService.batchShouldUpdate(pageInfos);
+        pagesToProcess = needsUpdateIds;
+        
+        NotionBackupLogger.cacheLog(`[缓存批量] 检查完成，共 ${pageIds.length} 个页面，需要更新 ${pagesToProcess.length} 个页面`);
+      }
+      
+      // 步骤3: 并发处理需要更新的页面，控制并发数
+      const processQueue = async (ids: string[]) => {
+        const chunks = this.chunkArray(ids, concurrency);
+        
+        for (const chunk of chunks) {
+          await Promise.all(
+            chunk.map(pageId => this.processPage({ 
+              pageId, 
+              parentPageIds,
+              isRoot: false // 在批处理中，所有页面都不是根页面，它们是作为其他页面的子页面被处理的
+            }))
+          );
+        }
+      };
+      
+      await processQueue(pagesToProcess);
+      
+      NotionBackupLogger.cacheLog(`[批量处理] 完成，共处理 ${pagesToProcess.length} 个页面`);
+    } catch (error) {
+      NotionBackupLogger.error('batch', `批量处理页面失败: ${error instanceof Error ? error.message : String(error)}`);
+      throw error;
     }
+  }
+  
+  /**
+   * 将数组分割成多个小块
+   * 用于控制并发处理
+   */
+  private chunkArray<T>(array: T[], size: number): T[][] {
+    const chunks: T[][] = [];
+    for (let i = 0; i < array.length; i += size) {
+      chunks.push(array.slice(i, i + size));
+    }
+    return chunks;
+  }
 
-    // 先处理直接的子页面
-    const directChildPages = data.children.filter((block: NotionBlock) => isChildPage(block));
-    if (directChildPages.length > 0) {
-      NotionBackupLogger.childPages(parentId, directChildPages.length);
-
-      if (!this.config.concurrency || this.config.concurrency <= 0) {
-        // 串行处理
-        const startTime = process.hrtime.bigint();
-        for (const childPage of directChildPages) {
-          await this.processPage({
-            pageId: childPage.id,
-            parentPageIds: [...ancestorIds, parentId],
-            isRoot: false
+  /**
+   * 处理子页面（包括直接子页面和嵌套在普通块中的子页面）
+   * 重构为使用优化的缓存检查方式
+   */
+  private async processChildPages(parentPageData: PageObject, parentId: string, parentPageIds: string[]): Promise<void> {
+    // 收集所有子页面信息
+    const childPages: Array<{ id: string; lastEditedTime: string }> = [];
+    const newParentChain = [...parentPageIds, parentId];
+    
+    // 1. 收集当前页面的子页面
+    if (parentPageData.children && Array.isArray(parentPageData.children)) {
+      for (const block of parentPageData.children) {
+        // 直接子页面
+        if (isChildPage(block) && block.id) {
+          childPages.push({
+            id: block.id,
+            lastEditedTime: block.last_edited_time || ''
           });
         }
-        const timeUsed = (Number(process.hrtime.bigint() - startTime) / 1_000_000).toFixed(2);
-        NotionBackupLogger.serialComplete(parentId, directChildPages.length, timeUsed);
-      } else {
-        // 并发处理
-        NotionBackupLogger.concurrentProcess(this.config.concurrency, directChildPages.length);
-        const startTime = process.hrtime.bigint();
-
-        // 分批处理子页面
-        for (let i = 0; i < directChildPages.length; i += this.config.concurrency) {
-          const batch = directChildPages.slice(i, i + this.config.concurrency);
-          const promises = batch.map((childPage: NotionBlock) =>
-            this.processPage({
-              pageId: childPage.id,
-              parentPageIds: [...ancestorIds, parentId],
-              isRoot: false
-            })
-          );
-          await Promise.all(promises);
+        // 嵌套子页面：block 中包含子页面引用
+        else if (block.has_children && block.children) {
+          for (const subBlock of block.children) {
+            if (isChildPage(subBlock) && subBlock.id) {
+              childPages.push({
+                id: subBlock.id,
+                lastEditedTime: subBlock.last_edited_time || ''
+              });
+            }
+          }
         }
-
-        const timeUsed = (Number(process.hrtime.bigint() - startTime) / 1_000_000).toFixed(2);
-        NotionBackupLogger.concurrentComplete(parentId, directChildPages.length, timeUsed);
       }
     }
-
-    // 递归处理嵌套在普通块中的子页面
-    await this.processNestedChildPages(data.children, parentId, ancestorIds);
+    
+    if (childPages.length === 0) {
+      // 即使没有直接子页面，仍需处理嵌套在普通块中的子页面
+      await this.processNestedChildPages(parentPageData.children, parentId, parentPageIds);
+      return;
+    }
+    
+    // 2. 批量处理子页面
+    NotionBackupLogger.cacheLog(`[子页面] 页面 ${parentId} 包含 ${childPages.length} 个子页面`);
+    
+    // 使用优化的批量处理方法
+    await this.batchProcessPages(
+      childPages.map(page => page.id),
+      { 
+        concurrency: 3, // 并发数，可根据实际情况调整
+        parentPageIds: newParentChain 
+      }
+    );
+    
+    // 3. 处理所有嵌套在普通块中的子页面
+    await this.processNestedChildPages(parentPageData.children, parentId, parentPageIds);
   }
 
   /**
