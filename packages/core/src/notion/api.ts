@@ -82,10 +82,24 @@ export class NotionApi {
   async getBlockChildren(options: { blockId: string }) {
     const { blockId } = options
     try {
-      const response = await this.client.blocks.children.list({
-        block_id: blockId,
-      })
-      return response.results
+      // 分页获取所有子块，避免遗漏（has_more/next_cursor）
+      const allResults: any[] = []
+      let startCursor: string | undefined = undefined
+      let hasMore = true
+
+      while (hasMore) {
+        const response = await this.client.blocks.children.list({
+          block_id: blockId,
+          start_cursor: startCursor,
+          page_size: 100,
+        })
+
+        allResults.push(...response.results)
+        hasMore = Boolean(response.has_more)
+        startCursor = response.next_cursor ?? undefined
+      }
+
+      return allResults
     } catch (error) {
       console.error(`获取块 ${blockId} 的子块失败:`, error)
       throw error
