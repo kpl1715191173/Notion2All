@@ -16,7 +16,8 @@
       "@notion2all/core": ["packages/core/src"],
       "@notion2all/web": ["packages/web/src"],
       "@notion2all/cli": ["packages/cli/src"],
-      "@notion2all/config": ["packages/config/src"]
+      "@notion2all/config": ["packages/config/src"],
+      "@notion2all/utils": ["packages/utils/src"]
     }
   },
   "exclude": ["node_modules", "dist"]
